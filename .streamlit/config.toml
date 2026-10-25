@@ -1,0 +1,31 @@
+# Settings for Streamlit in this project.
+
+[server]
+# Start without asking for an email address on first run.
+headless = true
+# Only this computer can open the pages, not other devices on the network.
+address = "localhost"
+
+[browser]
+# Do not send usage statistics to Streamlit.
+gatherUsageStats = false
+
+[client]
+# Hide the developer menu: visitors see only the page.
+toolbarMode = "minimal"
+
+[theme]
+# A dark grey, easy on the eyes: charcoal page, soft off-white text, one teal accent.
+base = "dark"
+primaryColor = "#5FB3A1"
+backgroundColor = "#202124"
+secondaryBackgroundColor = "#2A2B2F"
+textColor = "#E8E6E1"
+borderColor = "#3A3B40"
+linkColor = "#7CC4B4"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+# Headings use a serif loaded by the stylesheet in app/components.py; this is the fallback.
+headingFont = "serif"
+codeFont = "monospace"
+baseRadius = "0.75rem"
+showWidgetBorder = true

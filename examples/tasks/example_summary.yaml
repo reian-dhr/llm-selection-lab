@@ -1,0 +1,21 @@
+# A generic example task (invented content), so the public repository has one task to try.
+name: example_summary
+description: >
+  A good answer summarises the announcement in at most three sentences, keeps every number
+  exactly, invents nothing, and states the main change first.
+instruction: |
+  Summarise the announcement below in at most three sentences for a busy reader. State the
+  main change first, keep every number exactly as given, and add nothing that is not in it.
+inputs:
+  - id: easy_01
+    difficulty: easy
+    input: |
+      The city library (invented) will open on Sundays from 1 March, from 10:00 to 16:00.
+      The change follows a survey in which 62% of 1,400 members asked for weekend hours.
+    reference: null
+  - id: hard_01
+    difficulty: hard
+    input: |
+      The city library (invented) will open on Sundays from 1 March. A notice on the door
+      says from 10:00 to 16:00; the website says from 11:00 to 16:00. Parking stays free.
+    reference: null

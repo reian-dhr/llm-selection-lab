@@ -1,0 +1,18 @@
+# Runs the test suite on every push and pull request.
+# The tests use fake model clients, so no API keys are needed and nothing is spent.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2  # this action publishes exact versions only
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Run tests
+        run: uv run pytest

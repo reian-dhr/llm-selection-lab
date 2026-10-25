@@ -1,0 +1,33 @@
+[project]
+name = "model-selection-lab"
+version = "0.1.0"
+description = "Compare LLMs on your own task: quality, cost and speed."
+readme = "README.md"
+authors = [
+    { name = "Reian" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=1.13.0",
+    "httpx2>=2.13.1",
+    "mcp[cli]>=2.3.0",
+    "mistralai>=3.2.0",
+    "openai>=3.27.0",
+    "pandas>=3.0.6",
+    "python-dotenv>=1.2.4",
+    "pyyaml>=6.0.3",
+    "streamlit>=1.65.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.24,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.uv]
+# cryptography (needed by mcp) has no ready-made Intel Mac build after 48.x.
+constraint-dependencies = ["cryptography<49"]
