@@ -1,4 +1,4 @@
-# Model Selection Lab
+# LLM Selection Lab
 
 [![tests](https://github.com/reian-dhr/llm-selection-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/reian-dhr/llm-selection-lab/actions/workflows/tests.yml)
 
@@ -36,8 +36,9 @@ best answer shown, others one click away
    +--> "I prefer this one" --> saved as a pick --> an example for the judge next time
 ```
 
-Both flows share the same runner (`runs/`), unified model client (`models/`), judge
-(`judge/`) and storage.
+Both flows share the same runner (`runs/`), unified model client (`models/`) and
+storage. Only the web app uses the judge (`judge/`) so far: a check compares cost and
+speed, and saves every answer in `results/` to read.
 
 ## Design decisions
 
@@ -70,28 +71,33 @@ Both flows share the same runner (`runs/`), unified model client (`models/`), ju
 git clone https://github.com/reian-dhr/llm-selection-lab.git
 cd llm-selection-lab
 uv sync                              # install the dependencies
-cp .env.example .env                 # then add your API keys
+cp .env.example .env                 # then add your API keys (see below)
 uv run pytest                        # tests: no network, no cost
 uv run streamlit run app/main.py     # the web app, at http://localhost:8501
 ```
 
 Without the web app: `uv run python scripts/check_task.py "describe the task"`.
 
+Keys: one per compared provider (Anthropic, OpenAI, Mistral; a provider without a key
+just shows failed answers), and a free Groq key, which the helper and the judge need.
+The Python package is named `model_selection_lab`.
+
 ## Use it from Claude (MCP)
 
 Register the server with Claude Code (run from anywhere, with the path to this folder):
 
 ```
-claude mcp add model-selection-lab -- uv run --directory /path/to/model-selection-lab python -m model_selection_lab.mcp_server
+claude mcp add llm-selection-lab -- uv run --directory /path/to/llm-selection-lab python -m model_selection_lab.mcp_server
 ```
 
 Then ask, for example, "preview a check for: draft a cold email to a recruiter". Claude
 calls `preview_check`, shows the drafted test and its maximum cost, and calls `run_check`
-only once you agree. `list_checks` shows past checks.
+only once you agree. `list_checks` shows past checks. Premium models are never used
+from MCP.
 
 ## Tests
 
-`uv run pytest` runs about 100 tests in a few seconds. Every function that calls a model
+`uv run pytest` runs about 120 tests in a few seconds. Every function that calls a model
 accepts a stand-in, so tests use fakes: no network, no keys, no cost. GitHub Actions runs
 them on every push.
 
@@ -101,7 +107,7 @@ The web app runs on Streamlit Community Cloud from a GitHub repository, behind a
 password (`uv run python scripts/make_password_hash.py`). Secrets to set on the host: the
 provider API keys, `username`, `password_hash`, and for the backup `github_token` (write
 access to one private data repository) and `data_repo`. See
-[docs/how_it_works.md](docs/how_it_works.md), section 5.
+[docs/how_it_works.md](docs/how_it_works.md), section 5, for both.
 
 ## Limits and next steps
 
@@ -111,6 +117,10 @@ access to one private data repository) and `data_repo`. See
   shows the answers unranked.
 - Rules are written by hand. Next: when the judge disagrees with a pick, propose a rule
   change for the user to approve.
+- The check flow (command line and MCP) does not judge quality yet: it compares cost
+  and speed, and the answers are saved for you to read.
+- The sign-in lock counts wrong tries per browser session; it is not a rate limit.
+  Each request still has its spending cap.
 
 ## Learn more
 

@@ -63,5 +63,5 @@ if __name__ == "__main__":
         print("\n4. Recommendation:")
         for line in outcome.recommendation:
             print(f"  - {line}")
-        print("  - Quality: compare the answers and pick the best in the web app:")
-        print("    uv run streamlit run app/main.py")
+        print("  - Quality is not judged in a check yet: read the answers in")
+        print(f"    {outcome.results_path}")

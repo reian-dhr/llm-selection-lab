@@ -1,13 +1,13 @@
 """The judge: guesses which answer you would pick, using your rules and your past picks.
 
 For one test input, the judge sees the task, your rules, a few of your most recent picks
-(with your reasons) as examples, and every model's answer labelled A, B, C, D in the same
-shuffled order you see. It writes a short critique per answer, then picks one and lists any
+(with your reasons) as examples, and every model's answer labelled A, B, C... in a
+shuffled order, without model names. It writes a short critique per answer, then picks one and lists any
 it would refuse. It is a helper model from a family outside the comparison.
 
 The judge does not train. It improves because every new pick you make becomes an example
-for the next judgement. Its verdict is shown only after you have picked, so it cannot sway
-you, and agreement() measures how often it matched you.
+for the next judgement. agreement() measures how often it matched your picks. In the web
+app its pick is shown first, so your preference is given after seeing it.
 
 Verdicts for one check are kept in data/verdicts/<check>.jsonl, one line per input.
 """

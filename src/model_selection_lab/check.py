@@ -29,7 +29,7 @@ from model_selection_lab.settings import MAX_RUN_COST_USD, REUSE_ANSWERS_FOR_DAY
 
 @dataclass
 class CheckOutcome:
-    """Everything a check produced, for the command (or the platform) to show."""
+    """Everything a check produced, for the command line or the MCP server to show."""
 
     drafted: dict  # the helper model's full answer, with "understood" and "open_questions"
     task: Task

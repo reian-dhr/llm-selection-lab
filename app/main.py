@@ -1,4 +1,4 @@
-"""Model Selection Lab, the web app: one box, every model answers, the best answer first.
+"""LLM Selection Lab, the web app: one box, every model answers, the best answer first.
 
 Run with: uv run streamlit run app/main.py
 Then open http://localhost:8501 in the browser.
@@ -157,7 +157,10 @@ def show_outcome(outcome) -> None:
             label = f"Compare with the other {len(others)} answers"
         else:
             if outcome.judge_error:
-                st.info("The judge is busy (free tier). Here are all the answers, unranked.")
+                st.info(
+                    "The judge could not answer (free tier busy, or GROQ_API_KEY missing). "
+                    "Here are all the answers, unranked."
+                )
             else:
                 st.info("The judge found no answer clearly good. Here are all of them.")
             label = f"See the {len(others)} answers"
@@ -188,7 +191,7 @@ def run_request(request: str, include_premium: bool) -> None:
     st.rerun()  # show the result, with the input bar unlocked
 
 
-st.set_page_config(page_title="Model Selection Lab", page_icon=":material/balance:")
+st.set_page_config(page_title="LLM Selection Lab", page_icon=":material/balance:")
 apply_style()
 require_login()  # does nothing unless a password hash is configured
 pull_past_picks()  # does nothing unless the remote copy is configured

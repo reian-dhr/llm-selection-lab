@@ -1,8 +1,8 @@
 """Summary and recommendation: what the results say, per model, in a few lines.
 
 - summarise(): one row per model with calls, errors, cut-off answers, latency, tokens, cost.
-- recommend(): short plain sentences on cost and speed. Quality is not part of it yet: that
-  comes from the user's picks now, and from the judge later.
+- recommend(): short plain sentences on cost and speed. Quality is not part of it: in the
+  web app it comes from the judge and the user's picks.
 """
 
 import pandas as pd

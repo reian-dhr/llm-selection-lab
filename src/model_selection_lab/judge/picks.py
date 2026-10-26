@@ -1,18 +1,17 @@
-"""Picks: the expert's choice among the answers of all models to the same input.
+"""Picks: the user's choice among the answers of all models to the same input.
 
-For each input, the expert sees every model's answer side by side, without knowing which
-model wrote which, and records:
-- the answer they would actually use, and why,
-- any answer they would refuse outright, and why.
+A pick records:
+- the answer the user would actually use, and why,
+- any answer they would refuse outright, and why (optional).
 
-These picks are what the judge will be built from: the chosen answers show what "good"
+The judge learns from these picks (see judge.py): the chosen answers show what "good"
 looks like, the refused ones show what must never pass, and the reasons say why.
 
 Picks for one check (one drafted task) are kept in one .jsonl file, one line per pick.
 Picking again for the same input adds a new line, and the latest one counts.
 
-This file also prepares what the app shows: the answers of each input, and the shuffled order
-in which they appear (labelled A, B, C...), so the model behind each answer stays hidden.
+This file also reads the answers of each input, and fixes the shuffled order in which the
+judge sees them (labelled A, B, C...), so it cannot tell which model wrote which.
 """
 
 import json

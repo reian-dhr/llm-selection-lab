@@ -22,7 +22,7 @@ from model_selection_lab import check
 from model_selection_lab.runs.task_drafter import describe_understanding
 from model_selection_lab.settings import MAX_RUN_COST_USD
 
-server = MCPServer("model-selection-lab")
+server = MCPServer("llm-selection-lab")
 
 
 def describe_preview(outcome) -> str:
@@ -51,7 +51,9 @@ def describe_run(outcome) -> str:
         "Recommendation:",
     ]
     lines += [f"- {line}" for line in outcome.recommendation]
-    lines.append("- Quality: pick the best answer blind in the web app (app/main.py).")
+    lines.append(
+        f"- Quality is not judged in a check yet: read the answers in {outcome.results_path}."
+    )
     return "\n".join(lines)
 
 

@@ -94,10 +94,10 @@ def require_login() -> None:
     stored_hash = secret("password_hash")
     if not stored_hash or st.session_state.get("signed_in"):
         return
-    st.title("Model Selection Lab")
+    st.title("LLM Selection Lab")
     tries = st.session_state.get("sign_in_tries", 0)
     if tries >= MAX_SIGN_IN_TRIES:
-        st.error("Too many wrong tries. Reload the page later.")
+        st.error("Too many wrong tries. Reload the page to try again.")
         st.stop()
     with st.form("sign_in"):
         username = st.text_input("Username")

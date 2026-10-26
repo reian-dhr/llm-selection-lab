@@ -17,8 +17,9 @@ request --> every standard model answers --> judge picks the best --> best answe
 
 The command line (`scripts/check_task.py`) and the MCP server (`mcp_server.py`) run a fuller
 check of a kind of task: a helper drafts a test with three inputs (one with a trap), the
-models answer each, and a summary compares cost and speed. Both flows reuse the same runner,
-judge and storage.
+models answer each, and a summary compares cost and speed. Both flows reuse the same runner
+and storage; only the web app runs the judge so far, so a check's answers are saved in
+`results/` for you to read.
 
 ## 2. The web app
 
@@ -88,8 +89,9 @@ retries wait as long as the provider asks, up to 60 seconds.
 rules (`data/judge/*.md`: a file named `slide_*.md` applies to slide tasks, `general_*.md`
 to all), the 3 most recent picks with their reasons as examples, and the answers A to D. It
 writes a critique per answer, then a verdict. Each new pick becomes an example next time.
-Its verdict is hidden until the user picks, so it cannot anchor the choice, and the
-agreement score measures it honestly.
+In the web app its pick is shown first, so a preference is given after seeing it: the
+agreement between judge and user can be anchored by the judge, and should be read with
+that in mind.
 
 **Best answer first, feedback in one click.** The web app shows the judge's pick first,
 because the point is to get a good answer quickly. Disagreeing costs one click ("I prefer
@@ -127,8 +129,14 @@ Without configuration the app is open, which is fine on your own computer. To pr
    Environment variables work too: `APP_USERNAME` and `APP_PASSWORD_HASH`.
 
 Only a salted hash of the password is stored. Both fields are always checked and compared in
-constant time, and five wrong tries lock the session. Each request still has its spending cap.
-An optional `display_name` secret adds a name to the greeting.
+constant time. Five wrong tries block the form for that browser session; reloading the page
+starts a new session, so this slows guessing down but is not a rate limit. Each request
+still has its spending cap. An optional `display_name` secret adds a name to the greeting.
+
+**Backup (optional).** Online hosts wipe local files on restart. To keep requests and
+picks, create a private GitHub repository for the data and a fine-grained token with
+"Contents: read and write" on that repository only, then add two secrets: `github_token`
+(the token) and `data_repo` (`owner/name`). Without them nothing is copied.
 
 ## 6. Adding things
 
@@ -146,5 +154,5 @@ An optional `display_name` secret adds a name to the greeting.
   `TASK_DRAFTER_MODEL` and `JUDGE_MODEL` in `settings.py` if needed.
 - Later: daily spending cap, rate limits, judge notes ("the judge was wrong because"),
   agreement over time, Google login, the job cost in the app.
-- A drafted slide test does not reuse a hand-written slide instruction yet.
+- The check flow (command line and MCP) does not run the judge yet.
 - Refusals by a model are saved as empty answers, without a warning.

@@ -6,3 +6,9 @@ __pycache__/
 .venv/
 # Streamlit secrets (the app password hash): never committed.
 .streamlit/secrets.toml
+
+# Your own runs, picks, prompts and rules: created when the tool runs, kept out of Git.
+data/
+tasks/
+results/
+.pytest_cache/
