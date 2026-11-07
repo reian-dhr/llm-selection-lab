@@ -5,7 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
+from dataclasses import replace
+
 from model_selection_lab.models.call_result import RunResult
+from model_selection_lab.models.model_registry import ModelInfo
 from model_selection_lab.runs.batch_runner import build_prompt, estimate_max_cost, run_task
 from model_selection_lab.settings import (
     MAX_ANSWER_TOKENS,
@@ -99,10 +102,10 @@ def test_run_task_stops_when_spending_reaches_the_cap(tmp_path, capsys):
 def test_estimate_max_cost_assumes_full_length_answers():
     models = {
         "plain": SimpleNamespace(
-            reasoning=False, input_price_per_mtok=1.0, output_price_per_mtok=10.0
+            model_id="plain-id", reasoning=False, input_price_per_mtok=1.0, output_price_per_mtok=10.0
         ),
         "thinker": SimpleNamespace(
-            reasoning=True, input_price_per_mtok=1.0, output_price_per_mtok=10.0
+            model_id="thinker-id", reasoning=True, input_price_per_mtok=1.0, output_price_per_mtok=10.0
         ),
     }
     input_tokens = sum(
@@ -185,3 +188,24 @@ def test_saved_answers_are_not_reused_when_the_prompt_changed_or_they_failed(tmp
     run_task(changed, ["model-a"], second_path, run=counting_run, reusable=reusable)
 
     assert len(calls) == 2
+
+
+def test_saved_answers_are_not_reused_when_the_model_behind_a_key_changed(tmp_path):
+    old = ModelInfo(
+        provider="anthropic", model_id="model-v1", input_price_per_mtok=1.0,
+        output_price_per_mtok=1.0, docs_url="", date_checked="", reasoning=False,
+    )
+    new = replace(old, model_id="model-v2")  # the same key now points at a newer model
+    run_task(TASK, ["m"], tmp_path / "tiny_task_1.jsonl", run=fake_run, models={"m": old})
+    reusable = load_reusable_answers(tmp_path, "tiny_task", max_age_days=30)
+    calls = []
+
+    def counting_run(model_key, prompt, max_tokens):
+        calls.append(model_key)
+        return fake_run(model_key, prompt, max_tokens)
+
+    second_path = tmp_path / "tiny_task_2.jsonl"
+    run_task(TASK, ["m"], second_path, run=counting_run, reusable=reusable, models={"m": new})
+
+    assert len(calls) == 2  # both inputs asked again, nothing reused
+    assert estimate_max_cost(TASK, ["m"], {"m": new}, reusable=reusable) > 0

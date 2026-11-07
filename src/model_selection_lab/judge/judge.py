@@ -29,7 +29,7 @@ from model_selection_lab.settings import (
     JUDGE_PROMPT_EXAMPLE,
     JUDGE_RULES_FOLDER,
 )
-from model_selection_lab.text_files import read_text
+from model_selection_lab.text_files import read_records, read_text
 
 LETTERS = "ABCDEFGH"
 EXCERPT_CHARS = 400  # how much of an example answer the judge is shown
@@ -158,10 +158,8 @@ def load_verdicts(path: str) -> dict:
     """Read the verdicts of a check: input_id -> latest Verdict. Empty if none yet."""
     verdicts = {}
     if Path(path).exists():
-        for line in Path(path).read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                verdict = Verdict(**json.loads(line))
-                verdicts[verdict.input_id] = verdict
+        for verdict in read_records(path, lambda line: Verdict(**json.loads(line))):
+            verdicts[verdict.input_id] = verdict
     return verdicts
 
 
@@ -186,6 +184,11 @@ def judge_check(outcome, run=run_model, verdicts_folder: str = "data/verdicts", 
     for task_input in outcome.task.inputs:
         if task_input.id in done or task_input.id not in answers:
             continue
+        if len(answers[task_input.id]) > len(LETTERS):
+            raise ValueError(
+                f"The judge can compare at most {len(LETTERS)} answers, "
+                f"got {len(answers[task_input.id])}."
+            )
         order = shown_order(task_input.id, list(answers[task_input.id]))
         letter_to_model = dict(zip(LETTERS, order))
         prompt = build_judge_prompt(

@@ -117,3 +117,31 @@ def test_agreement_counts_inputs_where_judge_and_person_chose_the_same(tmp_path)
     (verdicts / "check_1.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
 
     assert agreement(picks, verdicts) == {"compared": 2, "agreed": 1}
+
+
+def test_judge_check_refuses_more_answers_than_it_has_letters(tmp_path):
+    many = [f"model-{number}" for number in range(9)]
+    results = tmp_path / "check_1_run.jsonl"
+    lines = [{"task_name": "check_1", "input_id": "easy_01", "model_key": m, "error": None,
+              "text": "x"} for m in many]
+    results.write_text("".join(json.dumps(line) + "\n" for line in lines), encoding="utf-8")
+    task = Task(name="check_1", description="d", instruction="i",
+                inputs=[TaskInput(id="easy_01", difficulty="easy", input="f", reference=None)])
+    outcome = SimpleNamespace(task=task, results_path=str(results))
+
+    with pytest.raises(ValueError, match="at most 8"):
+        judge_check(outcome, run=lambda *args, **kwargs: 1 / 0, template=TEMPLATE,
+                    verdicts_folder=tmp_path / "verdicts")
+
+
+def test_load_verdicts_skips_an_unreadable_line_and_says_so(tmp_path, capsys):
+    good = {"input_id": "easy_01", "chosen_model": "model-a", "reason": "", "refused_models": [],
+            "refusal_reason": "", "critiques": {}, "judge_model": "j", "timestamp": "t",
+            "results_file": "r"}
+    path = tmp_path / "check_1.jsonl"
+    path.write_text(json.dumps(good) + "\n{cut off\n" + json.dumps({"surprise": 1}) + "\n")
+
+    verdicts = load_verdicts(path)
+
+    assert list(verdicts) == ["easy_01"]
+    assert capsys.readouterr().out.count("Skipped an unreadable line") == 2

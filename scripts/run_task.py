@@ -8,12 +8,13 @@ Add --fresh to ignore saved answers and call every model again.
 
 This makes real API calls, so it costs money. An answer already saved for the same
 prompt and model is reused and costs nothing.
-Each run writes a new file in results/, named with the task and the start time.
+Each run writes a new file in results/, named with the task and the start time
+(see run_path_for in check.py).
 """
 
 import argparse
-from datetime import datetime
 
+from model_selection_lab.check import run_path_for
 from model_selection_lab.models.model_registry import MODELS, select_models
 from model_selection_lab.runs.batch_runner import estimate_max_cost, run_task
 from model_selection_lab.runs.results_storage import load_reusable_answers
@@ -49,8 +50,7 @@ if __name__ == "__main__":
     model_keys = select_models(include_premium=arguments.premium)
     skipped = [key for key in MODELS if key not in model_keys]
 
-    started = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = f"results/{task.name}_{started}.jsonl"
+    output_path = run_path_for(task.name)
 
     print(f"Task '{task.name}': {len(task.inputs)} inputs on {len(model_keys)} models")
     print(f"Models: {', '.join(model_keys)}")

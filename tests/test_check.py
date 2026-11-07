@@ -1,6 +1,8 @@
 """Tests for check.py: the whole chain, with fake models and temporary folders. No network."""
 
-from model_selection_lab.check import list_checks, load_check, run_check
+import os
+
+from model_selection_lab.check import latest_run, list_checks, load_check, run_check, run_path_for
 from model_selection_lab.models.call_result import RunResult
 
 TEMPLATE = "Write {{NUMBER_OF_INPUTS}} inputs for: {{DESCRIPTION}}"
@@ -69,3 +71,23 @@ def test_a_past_check_can_be_listed_and_loaded_back(tmp_path):
     loaded = load_check(checks[0]["task_path"], results_folder=results)
     assert loaded.results_path == first.results_path
     assert list(loaded.summary.index) == first.model_keys
+
+
+def test_a_run_file_made_by_the_helper_is_found_as_the_latest_run(tmp_path):
+    path = run_path_for("short_summary_20261107_100000", tmp_path)
+    tmp_path.mkdir(exist_ok=True)
+    open(path, "w").close()
+
+    assert latest_run("short_summary_20261107_100000", tmp_path) == path
+
+
+def test_the_latest_run_is_the_newest_file_whatever_its_name_style(tmp_path):
+    # An older file named with the time only (21:30), a newer one named with date and time.
+    old = tmp_path / "task_x_run_213000.jsonl"
+    new = tmp_path / "task_x_run_20261107_100000.jsonl"
+    old.write_text("")
+    new.write_text("")
+    os.utime(old, (1_000, 1_000))
+    os.utime(new, (2_000, 2_000))
+
+    assert latest_run("task_x", tmp_path) == str(new)

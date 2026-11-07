@@ -16,6 +16,7 @@ import argparse
 from pathlib import Path
 
 from model_selection_lab.check import finish_check, prepare_check
+from model_selection_lab.report.summary import format_report
 from model_selection_lab.runs.task_drafter import describe_understanding
 from model_selection_lab.settings import MAX_RUN_COST_USD
 
@@ -55,13 +56,5 @@ if __name__ == "__main__":
     else:
         print("\n2. Running the test on the models...\n")
         outcome = finish_check(outcome, max_cost_usd=arguments.max_cost)
-        print("\n3. Summary per model:\n")
-        decimals = {
-            "median_latency_s": 2, "avg_input_tokens": 0, "avg_output_tokens": 0, "avg_cost_usd": 6
-        }
-        print(outcome.summary.round(decimals).to_string(na_rep="-"))
-        print("\n4. Recommendation:")
-        for line in outcome.recommendation:
-            print(f"  - {line}")
-        print("  - Quality is not judged in a check yet: read the answers in")
-        print(f"    {outcome.results_path}")
+        print("\n3. Summary per model and recommendation:\n")
+        print(format_report(outcome.summary, outcome.recommendation, outcome.results_path))

@@ -72,12 +72,19 @@ def push_file(path: str, token: str, repo: str, branch: str = DATA_BRANCH,
         body["sha"] = existing["sha"]  # GitHub needs it to replace a file
     status, answer = http("PUT", url, token, body)
     if status not in (200, 201):
-        raise RuntimeError(f"GitHub refused to save {path}: {status} {answer}")
+        reason = answer.get("message", "") if isinstance(answer, dict) else ""
+        raise RuntimeError(f"GitHub refused to save {Path(path).name}: {status} ({reason})")
 
 
 def download(path: str, token: str, repo: str, branch: str = DATA_BRANCH,
              http=github_request) -> bool:
-    """Download one file from the branch to the same local path. False if missing."""
+    """Download one file from the branch to the same local path. False if missing.
+
+    A file that already exists locally is kept: it may hold a pick that never reached the
+    branch (a failed backup), and the online copy would erase it.
+    """
+    if Path(path).exists():
+        return False
     status, answer = http("GET", contents_url(repo, path, branch), token)
     if status != 200:
         return False
@@ -87,8 +94,8 @@ def download(path: str, token: str, repo: str, branch: str = DATA_BRANCH,
 
 
 def pull_picks(token: str, repo: str, branch: str = DATA_BRANCH, http=github_request) -> int:
-    """Download every picks file and the results file of the same request. Returns how many
-    picks files were downloaded (0 if the branch is still empty)."""
+    """Download every picks file and the results file of the same request, except those
+    already present locally. Returns how many picks files the branch holds (0 if empty)."""
     status, listing = http("GET", contents_url(repo, PICKS_FOLDER, branch), token)
     if status != 200:
         return 0

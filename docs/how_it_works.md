@@ -129,9 +129,9 @@ Without configuration the app is open, which is fine on your own computer. To pr
    Environment variables work too: `APP_USERNAME` and `APP_PASSWORD_HASH`.
 
 Only a salted hash of the password is stored. Both fields are always checked and compared in
-constant time. Five wrong tries block the form for that browser session; reloading the page
-starts a new session, so this slows guessing down but is not a rate limit. Each request
-still has its spending cap. An optional `display_name` secret adds a name to the greeting.
+constant time. Five wrong tries lock sign-in for the whole running app for five minutes
+(opening a new browser tab does not reset it; the right password is refused too while it
+is locked). Each request still has its spending cap. An optional `display_name` secret adds a name to the greeting.
 
 **Backup (optional).** Online hosts wipe local files on restart. To keep requests and
 picks, create a private GitHub repository for the data and a fine-grained token with

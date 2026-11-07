@@ -79,9 +79,7 @@ def finish_check(
 ) -> CheckOutcome:
     """Run the prepared test on the models, then add the summary and the recommendation."""
     task, model_keys, reusable = outcome.task, outcome.model_keys, outcome.reusable
-    # The drafted task name already holds the date, so the file name adds only the time.
-    started = datetime.now().strftime("%H%M%S")
-    outcome.results_path = f"{results_folder}/{task.name}_run_{started}.jsonl"
+    outcome.results_path = run_path_for(task.name, results_folder)
     run_task(
         task, model_keys, outcome.results_path, run=run,
         max_cost_usd=max_cost_usd, reusable=reusable,
@@ -111,10 +109,19 @@ def run_check(
     return finish_check(outcome, max_cost_usd, run, results_folder)
 
 
+def run_path_for(task_name: str, results_folder: str = "results") -> str:
+    """Where a new run of a task saves its answers. Every way of running a task uses this
+    name, so latest_run() finds the run whichever way it was made."""
+    return f"{results_folder}/{task_name}_run_{datetime.now():%Y%m%d_%H%M%S}.jsonl"
+
+
 def latest_run(task_name: str, results_folder: str = "results") -> str | None:
-    """Return the newest results file of a check, or None if it was never run."""
-    runs = sorted(Path(results_folder).glob(f"{task_name}_run_*.jsonl"))
-    return str(runs[-1]) if runs else None
+    """Return the newest results file of a check, or None if it was never run.
+    Newest means last modified: older files were named with the time only."""
+    runs = list(Path(results_folder).glob(f"{task_name}_run_*.jsonl"))
+    if not runs:
+        return None
+    return str(max(runs, key=lambda run: run.stat().st_mtime))
 
 
 def list_checks(tasks_folder: str = GENERATED_FOLDER, results_folder: str = "results") -> list:

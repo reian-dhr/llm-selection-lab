@@ -60,3 +60,15 @@ def recommend(summary: pd.DataFrame) -> list[str]:
     if left_out:
         lines.append(f"Left out because of errors or cut-off answers: {', '.join(left_out)}.")
     return lines
+
+
+DECIMALS = {"median_latency_s": 2, "avg_input_tokens": 0, "avg_output_tokens": 0, "avg_cost_usd": 6}
+
+
+def format_report(summary: pd.DataFrame, recommendation: list[str], results_path: str) -> str:
+    """The summary table, the recommendation and a pointer to the answers, as plain text.
+    The command line and the MCP server both show a check this way."""
+    lines = [summary.round(DECIMALS).to_string(na_rep="-"), "", "Recommendation:"]
+    lines += [f"- {line}" for line in recommendation]
+    lines.append(f"- Quality is not judged in a check yet: read the answers in {results_path}")
+    return "\n".join(lines)

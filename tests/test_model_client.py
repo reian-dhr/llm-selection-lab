@@ -299,3 +299,29 @@ def test_a_very_long_wait_is_capped():
     call_openai("gpt-6-luna", "hi", client=client, sleep=waits.append)
 
     assert waits == [MAX_RETRY_WAIT_S]
+
+
+@pytest.mark.parametrize(
+    "function, model_key, class_name, response, timeout_argument, timeout_value",
+    [
+        (call_anthropic, "haiku-5-5", "Anthropic", fake_anthropic_response(), "timeout", 7),
+        (call_openai, "gpt-6-luna", "OpenAI", fake_openai_response(), "timeout", 7),
+        (call_mistral, "mistral-small-4", "Mistral", fake_mistral_response(), "timeout_ms", 7000),
+        (call_groq, "qwen-3-8-27b", "OpenAI", fake_groq_response(), "timeout", 7),
+    ],
+)
+def test_every_default_client_gets_a_request_timeout(
+    monkeypatch, function, model_key, class_name, response, timeout_argument, timeout_value
+):
+    created_with = {}
+
+    def fake_client_class(**kwargs):
+        created_with.update(kwargs)
+        return ScriptedClient([response])
+
+    monkeypatch.setattr(client_module, class_name, fake_client_class)
+    monkeypatch.setattr(client_module, "REQUEST_TIMEOUT_S", 7)
+
+    function(model_key, "hello")
+
+    assert created_with[timeout_argument] == timeout_value

@@ -3,7 +3,11 @@
 import json
 
 from model_selection_lab.models.call_result import RunResult
-from model_selection_lab.runs.results_storage import append_result, make_record
+from dataclasses import replace
+
+from model_selection_lab.models.model_registry import ModelInfo
+from model_selection_lab.runs import results_storage
+from model_selection_lab.runs.results_storage import append_result, fingerprint_call, make_record
 
 SUCCESS = RunResult(
     text="Revenue grew 17%\n- bullet",
@@ -49,3 +53,24 @@ def test_append_result_adds_one_line_per_record(tmp_path):
     assert lines[1]["model_key"] == "model-b"
     assert lines[1]["error"] == "timeout"
     assert lines[0]["truncated"] is False
+
+
+def test_fingerprint_changes_when_the_model_or_its_settings_change(monkeypatch):
+    plain = ModelInfo(
+        provider="anthropic", model_id="model-v1", input_price_per_mtok=1.0,
+        output_price_per_mtok=1.0, docs_url="", date_checked="", reasoning=False,
+    )
+    models = {"m": plain}
+    original = fingerprint_call("Say hi.", "m", models)
+
+    assert fingerprint_call("Say hi.", "m", models) == original  # stable
+    assert fingerprint_call("Say bye.", "m", models) != original  # other prompt
+    assert fingerprint_call("Say hi.", "m", {"m": replace(plain, model_id="model-v2")}) != original
+    assert fingerprint_call("Say hi.", "m", {"m": replace(plain, reasoning=True)}) != original
+    monkeypatch.setattr(results_storage, "MAX_ANSWER_TOKENS", 2000)  # other answer limit
+    assert fingerprint_call("Say hi.", "m", models) != original
+
+
+def test_fingerprint_of_a_model_not_in_the_registry_still_depends_on_prompt_and_key():
+    assert fingerprint_call("Say hi.", "unknown", {}) != fingerprint_call("Say bye.", "unknown", {})
+    assert fingerprint_call("Say hi.", "unknown", {}) != fingerprint_call("Say hi.", "other", {})

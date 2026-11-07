@@ -24,7 +24,7 @@ from openai import OpenAI
 from model_selection_lab.models.call_result import RunResult
 from model_selection_lab.models.model_registry import MODELS
 from model_selection_lab.models.retry import call_with_retries, is_retryable
-from model_selection_lab.settings import MAX_ANSWER_TOKENS, THINKING_EXTRA_TOKENS
+from model_selection_lab.settings import MAX_ANSWER_TOKENS, REQUEST_TIMEOUT_S, THINKING_EXTRA_TOKENS
 
 # API keys live in the .env file. Python does not read that file by itself,
 # so this copies the keys into the environment where the libraries look for them.
@@ -51,7 +51,8 @@ def call_anthropic(
         # max_retries=0: the library retries 2 times on its own by default, but we
         # have our own retry loop and want it to be the only one.
         # Source: https://platform.claude.com/docs/en/cli-sdks-libraries/sdks/python#retries
-        client = Anthropic(max_retries=0)  # reads ANTHROPIC_API_KEY from the environment
+        # reads ANTHROPIC_API_KEY from the environment
+        client = Anthropic(max_retries=0, timeout=REQUEST_TIMEOUT_S)
 
     # Only send optional settings when we have them.
     options = {}
@@ -94,7 +95,8 @@ def call_openai(
     if client is None:
         # max_retries=0: same reason as in call_anthropic.
         # Source: https://developers.openai.com/api/reference/python
-        client = OpenAI(max_retries=0)  # reads OPENAI_API_KEY from the environment
+        # reads OPENAI_API_KEY from the environment
+        client = OpenAI(max_retries=0, timeout=REQUEST_TIMEOUT_S)
 
     # Only send optional settings when we have them.
     options = {}
@@ -135,7 +137,10 @@ def call_mistral(
     """
     model = MODELS[model_key]
     if client is None:
-        client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+        client = Mistral(
+            api_key=os.environ.get("MISTRAL_API_KEY"),
+            timeout_ms=int(REQUEST_TIMEOUT_S * 1000),  # Mistral counts in milliseconds
+        )
 
     # Mistral takes the system prompt as the first message of the conversation.
     messages = [{"role": "user", "content": prompt}]
@@ -187,6 +192,7 @@ def call_groq(
             base_url="https://api.groq.com/openai/v1",
             api_key=os.environ.get("GROQ_API_KEY"),
             max_retries=0,
+            timeout=REQUEST_TIMEOUT_S,
         )
 
     messages = [{"role": "user", "content": prompt}]

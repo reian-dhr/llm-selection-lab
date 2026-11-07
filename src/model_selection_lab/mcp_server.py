@@ -16,13 +16,25 @@ Start it from the project folder (so data/, tasks/ and results/ are found):
   uv run python -m model_selection_lab.mcp_server
 """
 
+from pathlib import Path
+
 from mcp.server import MCPServer
 
 from model_selection_lab import check
+from model_selection_lab.report.summary import format_report
 from model_selection_lab.runs.task_drafter import describe_understanding
+from model_selection_lab.runs.task_loader import TASK_FOLDERS
 from model_selection_lab.settings import MAX_RUN_COST_USD
 
 server = MCPServer("llm-selection-lab")
+
+
+def is_task_file(task_path: str) -> bool:
+    """True if the path is a YAML file inside one of the task folders (".." cannot escape)."""
+    path = Path(task_path).resolve()
+    return path.suffix == ".yaml" and any(
+        path.is_relative_to(Path(folder).resolve()) for folder in TASK_FOLDERS
+    )
 
 
 def describe_preview(outcome) -> str:
@@ -40,21 +52,8 @@ def describe_preview(outcome) -> str:
 
 def describe_run(outcome) -> str:
     """The summary table and the recommendation, as text."""
-    decimals = {
-        "median_latency_s": 2, "avg_input_tokens": 0, "avg_output_tokens": 0, "avg_cost_usd": 6
-    }
-    lines = [
-        f"Results saved to: {outcome.results_path}",
-        "",
-        outcome.summary.round(decimals).to_string(na_rep="-"),
-        "",
-        "Recommendation:",
-    ]
-    lines += [f"- {line}" for line in outcome.recommendation]
-    lines.append(
-        f"- Quality is not judged in a check yet: read the answers in {outcome.results_path}."
-    )
-    return "\n".join(lines)
+    report = format_report(outcome.summary, outcome.recommendation, outcome.results_path)
+    return f"Results saved to: {outcome.results_path}\n\n{report}"
 
 
 @server.tool()
@@ -70,6 +69,8 @@ def preview_check(description: str) -> str:
 def run_check(task_path: str) -> str:
     """Run a previewed test on the standard models and return cost, speed and a
     recommendation. Costs money: only call it after the user agreed to the preview."""
+    if not is_task_file(task_path):
+        return f"Refused: {task_path} is not a test file in {' or '.join(TASK_FOLDERS)}."
     outcome = check.load_check(task_path)
     if outcome.max_cost_usd > MAX_RUN_COST_USD:
         return (

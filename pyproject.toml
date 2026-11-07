@@ -31,3 +31,7 @@ dev = [
 [tool.uv]
 # cryptography (needed by mcp) has no ready-made Intel Mac build after 48.x.
 constraint-dependencies = ["cryptography<49"]
+
+[tool.pytest.ini_options]
+# The web app folder is not a package; this lets tests import its helpers (components.py).
+pythonpath = ["app"]

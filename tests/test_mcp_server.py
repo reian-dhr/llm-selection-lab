@@ -21,6 +21,7 @@ def use_fakes(monkeypatch, tmp_path):
         check, "load_check",
         partial(check.load_check, results_folder=folders["results_folder"]),
     )
+    monkeypatch.setattr(mcp_server, "TASK_FOLDERS", (str(tmp_path / "tasks"),))
 
 
 def test_preview_shows_the_cost_and_asks_before_running(monkeypatch, tmp_path):
@@ -53,3 +54,16 @@ def test_run_refuses_above_the_cap(monkeypatch, tmp_path):
     text = mcp_server.run_check(outcome.task_path)
 
     assert text.startswith("Refused")
+
+
+def test_run_refuses_a_file_outside_the_task_folders(monkeypatch, tmp_path):
+    use_fakes(monkeypatch, tmp_path)
+    elsewhere = tmp_path / "notes.yaml"
+    elsewhere.write_text("name: not_a_task\n")
+    monkeypatch.setattr(check, "load_check", lambda *args: 1 / 0)  # must never be reached
+
+    text = mcp_server.run_check(str(elsewhere))
+    dotted = mcp_server.run_check(str(tmp_path / "tasks" / ".." / "notes.yaml"))
+
+    assert text.startswith("Refused")
+    assert dotted.startswith("Refused")

@@ -80,6 +80,18 @@ def test_push_raises_when_github_refuses(tmp_path, monkeypatch):
         push_file("picks.jsonl", "token", REPO, http=FakeGitHub(refuse_writes=True))
 
 
+def test_the_failure_message_gives_the_status_and_github_s_reason_only(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "picks.jsonl").write_text("new\n")
+
+    with pytest.raises(RuntimeError) as problem:
+        push_file("picks.jsonl", "token", REPO, http=FakeGitHub(refuse_writes=True))
+
+    assert str(problem.value) == (
+        "GitHub refused to save picks.jsonl: 403 (Resource not accessible)"
+    )
+
+
 def test_pull_downloads_picks_and_their_answers(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     github = FakeGitHub({
@@ -94,6 +106,21 @@ def test_pull_downloads_picks_and_their_answers(tmp_path, monkeypatch):
     assert (tmp_path / "data/picks/ask_1.jsonl").read_text() == "pick\n"
     assert (tmp_path / "results/ask_1.jsonl").read_text() == "answers\n"
     assert not (tmp_path / "results/ask_2.jsonl").exists()  # not needed by the judge
+
+
+def test_pull_keeps_a_file_that_already_exists_locally(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data/picks").mkdir(parents=True)
+    (tmp_path / "data/picks/ask_1.jsonl").write_text("local pick, never backed up\n")
+    github = FakeGitHub({
+        "data/picks/ask_1.jsonl": b"older online pick\n",
+        "results/ask_1.jsonl": b"answers\n",
+    })
+
+    pull_picks("token", REPO, http=github)
+
+    assert (tmp_path / "data/picks/ask_1.jsonl").read_text() == "local pick, never backed up\n"
+    assert (tmp_path / "results/ask_1.jsonl").read_text() == "answers\n"  # missing: downloaded
 
 
 def test_pull_from_an_empty_repository_does_nothing(tmp_path, monkeypatch):

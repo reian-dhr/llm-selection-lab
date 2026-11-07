@@ -19,6 +19,11 @@ MAX_ANSWER_TOKENS = 1000
 # billed as output, so this is also the most a call can add to the cost.
 THINKING_EXTRA_TOKENS = 4000
 
+# How long one call may wait for the provider's answer, in seconds. The libraries wait 10
+# minutes by default, which would freeze a request for up to 30 minutes over 3 tries.
+# Models that think can need over a minute, so this is generous.
+REQUEST_TIMEOUT_S = 120
+
 # How many times one call is tried before giving up: 1 first try + 2 retries.
 MAX_TRIES = 3
 
@@ -102,3 +107,12 @@ JUDGE_PROMPT_EXAMPLE = "examples/prompts/judge.md"
 # Your rules for the judge, one Markdown file per kind of task. A file named slide_*.md
 # applies when the task mentions "slide"; a file named general_*.md always applies.
 JUDGE_RULES_FOLDER = "data/judge"
+
+# --- Signing in to the online app ---
+
+# After this many wrong tries, nobody can sign in until the lock runs out. The count is
+# shared by every visitor of the running app, so opening a new browser tab does not reset it.
+SIGN_IN_MAX_FAILURES = 5
+
+# How long the lock lasts, in seconds, counted from the last wrong try.
+SIGN_IN_LOCK_S = 300

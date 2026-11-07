@@ -72,3 +72,15 @@ def test_save_then_load_picks_keeps_the_latest_per_input(tmp_path):
     assert picks["hard_01"].chosen_model is None
     assert picks["hard_01"].refused_models == ["model-c"]
     assert picks["hard_01"].shown_order == ORDER
+
+
+def test_load_picks_skips_an_unreadable_line_and_says_so(tmp_path, capsys):
+    path = tmp_path / "check_1.jsonl"
+    save_pick(path, make_pick("easy_01", "model-a", "Clear.", [], "", ORDER))
+    with open(path, "a", encoding="utf-8") as file:
+        file.write('{"input_id": "cut off\n' + json.dumps({"surprise": 1}) + "\n")
+
+    picks = load_picks(path)
+
+    assert list(picks) == ["easy_01"]
+    assert capsys.readouterr().out.count("Skipped an unreadable line") == 2

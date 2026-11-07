@@ -64,7 +64,7 @@ def back_up(*paths: str) -> None:
             remote_store.push_file(path, *remote())
         except Exception as problem:
             print(f"Could not back up {path}: {problem}")
-            st.toast("Saved on this server, but the online backup failed.")
+            st.toast(f"Saved on this server, but the online backup failed. {problem}")
 
 
 def premium_switch(disabled: bool) -> bool:
@@ -85,7 +85,8 @@ def show_welcome(include_premium: bool) -> None:
     st.markdown(
         "<p class='muted' style='text-align:center'>Ask anything. "
         f"{names} answer, and a judge picks the best.<br>"
-        f"{which}, each request stops at ${MAX_RUN_COST_USD:.0f}.</p>",
+        f"{which}, each request stops at ${MAX_RUN_COST_USD:.0f}.<br>"
+        f"Online backup: {'on' if remote() else 'off'}.</p>",
         unsafe_allow_html=True,
     )
 

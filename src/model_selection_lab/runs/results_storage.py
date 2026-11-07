@@ -6,7 +6,8 @@ rewritten, so a run that stops halfway keeps everything it had finished.
 
 This file has five things:
 - ResultRecord: what one saved line contains.
-- hash_prompt(): a short fingerprint of a prompt, to recognise the same prompt later.
+- fingerprint_call(): a short fingerprint of a call (prompt, model, settings), to recognise
+  the same call later.
 - make_record(): builds a ResultRecord from a RunResult, and stamps the time.
 - append_result(): writes one ResultRecord as one line at the end of the file.
 - load_reusable_answers(): finds saved answers that can be reused instead of paid for again.
@@ -19,6 +20,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from model_selection_lab.models.call_result import RunResult
+from model_selection_lab.models.model_registry import MODELS
+from model_selection_lab.settings import MAX_ANSWER_TOKENS, THINKING_EXTRA_TOKENS
 
 
 @dataclass
@@ -37,16 +40,25 @@ class ResultRecord:
     cost_usd: float
     error: str | None  # None means the call succeeded
     truncated: bool  # True if the answer was cut off at the length limit
-    prompt_hash: str  # fingerprint of the exact prompt sent, see hash_prompt()
+    prompt_hash: str  # fingerprint of the exact call (prompt, model, settings), see fingerprint_call()
 
 
-def hash_prompt(prompt: str) -> str:
-    """Return a short fingerprint of a prompt: the same text always gives the same code.
+def fingerprint_call(prompt: str, model_key: str, models: dict = MODELS) -> str:
+    """Return a short fingerprint of a call: the same call always gives the same code.
 
-    If the task instruction or the input changes at all, the fingerprint changes, so an
-    answer saved for the old wording is never reused for the new one.
+    It covers the prompt and everything that shapes the answer: the model's ID, whether it
+    thinks, and the answer length limit. If any of them changes, an answer saved earlier is
+    never reused for the new call. A key missing from the registry (only in tests) is
+    fingerprinted by its name alone.
+    models: the registry to read the model from. Tests pass a small fake one.
     """
-    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+    model = models.get(model_key)
+    if model is None:
+        settings = model_key
+    else:
+        limit = MAX_ANSWER_TOKENS + (THINKING_EXTRA_TOKENS if model.reasoning else 0)
+        settings = f"{model.model_id}|{model.reasoning}|{limit}"
+    return hashlib.sha256(f"{settings}|{prompt}".encode("utf-8")).hexdigest()[:16]
 
 
 def make_record(

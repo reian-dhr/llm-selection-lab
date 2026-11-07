@@ -16,7 +16,7 @@ saved for the same prompt and model is reused instead of being paid for again.
 from model_selection_lab.models.call_result import RunResult
 from model_selection_lab.models.model_client import run_model
 from model_selection_lab.models.model_registry import MODELS, calculate_cost
-from model_selection_lab.runs.results_storage import append_result, hash_prompt, make_record
+from model_selection_lab.runs.results_storage import append_result, fingerprint_call, make_record
 from model_selection_lab.runs.task_loader import Task
 from model_selection_lab.settings import (
     MAX_ANSWER_TOKENS,
@@ -51,7 +51,7 @@ def estimate_max_cost(
         prompt = build_prompt(task.instruction, task_input.input)
         input_tokens = len(prompt.split()) * TOKENS_PER_WORD_ESTIMATE
         for model_key in model_keys:
-            if (task_input.id, model_key, hash_prompt(prompt)) in reusable:
+            if (task_input.id, model_key, fingerprint_call(prompt, model_key, models)) in reusable:
                 continue
             model = models[model_key]
             output_tokens = MAX_ANSWER_TOKENS
@@ -89,12 +89,15 @@ def run_task(
     run=run_model,
     max_cost_usd: float = MAX_RUN_COST_USD,
     reusable: dict | None = None,
+    models: dict = MODELS,
 ) -> None:
     """Run every input of the task on every model and append each result to output_path.
 
     run: the function that makes one call. Tests pass a fake one so they need no network.
     max_cost_usd: the spending cap. The run stops before the next call once spending
         has reached it. Answers already saved are kept.
+    models: the registry, used to tell whether a saved answer came from the same model and
+        settings. Tests pass a small fake one.
     reusable: saved answers from load_reusable_answers(). When one matches the input,
         the model and the exact prompt, it is copied into this run's file and no call
         is made.
@@ -107,8 +110,8 @@ def run_task(
     spent = 0.0
     for task_input in task.inputs:
         prompt = build_prompt(task.instruction, task_input.input)
-        prompt_hash = hash_prompt(prompt)
         for model_key in model_keys:
+            prompt_hash = fingerprint_call(prompt, model_key, models)
             saved = reusable.get((task_input.id, model_key, prompt_hash))
             if saved is not None:
                 append_result(output_path, saved)

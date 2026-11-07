@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from model_selection_lab.settings import PICK_SHUFFLE_SEED
+from model_selection_lab.text_files import read_records
 
 
 @dataclass
@@ -85,11 +86,8 @@ def load_picks(path: str) -> dict:
     picks = {}
     if not Path(path).exists():
         return picks
-    with open(path, encoding="utf-8") as file:
-        for line in file:
-            if line.strip():
-                pick = Pick(**json.loads(line))
-                picks[pick.input_id] = pick  # later lines replace earlier ones
+    for pick in read_records(path, lambda line: Pick(**json.loads(line))):
+        picks[pick.input_id] = pick  # later lines replace earlier ones
     return picks
 
 

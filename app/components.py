@@ -16,7 +16,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from model_selection_lab.auth import check_password
+from model_selection_lab.auth import SignInGuard, check_password
 
 # A short stylesheet on top of the theme: a narrow reading column, no Streamlit chrome,
 # and chat bubbles.
@@ -68,7 +68,10 @@ h1 {font-family: 'Source Serif 4', Georgia, serif !important; font-weight: 400 !
 </style>
 """
 
-MAX_SIGN_IN_TRIES = 5
+@st.cache_resource
+def sign_in_guard() -> SignInGuard:
+    """One guard for the whole running app, shared by every visitor's session."""
+    return SignInGuard()
 
 
 def apply_style() -> None:
@@ -95,9 +98,9 @@ def require_login() -> None:
     if not stored_hash or st.session_state.get("signed_in"):
         return
     st.title("LLM Selection Lab")
-    tries = st.session_state.get("sign_in_tries", 0)
-    if tries >= MAX_SIGN_IN_TRIES:
-        st.error("Too many wrong tries. Reload the page to try again.")
+    guard = sign_in_guard()
+    if guard.locked():
+        st.error("Too many wrong tries. Wait a few minutes and try again.")
         st.stop()
     with st.form("sign_in"):
         username = st.text_input("Username")
@@ -110,9 +113,10 @@ def require_login() -> None:
             )
             right_password = check_password(password, stored_hash)
             if right_name and right_password:
+                guard.record_success()
                 st.session_state.signed_in = True
                 st.rerun()
-            st.session_state.sign_in_tries = tries + 1
+            guard.record_failure()
             st.error("Wrong username or password.")
     st.stop()
 
