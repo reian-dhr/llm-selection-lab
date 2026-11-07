@@ -242,3 +242,40 @@ def test_agreement_also_gives_the_chance_level_and_an_interval(tmp_path):
     assert (result["compared"], result["agreed"]) == (2, 1)
     assert result["chance"] == pytest.approx(2 / 3)  # a random judge agrees 1 in 3, twice
     assert result["low"] < 0.5 < result["high"]
+
+
+def one_input_outcome(tmp_path):
+    results = tmp_path / "check_1_run.jsonl"
+    write_run(results)
+    task = Task(name="check_1", description="d", instruction="i",
+                inputs=[TaskInput(id="easy_01", input="facts")])
+    return SimpleNamespace(task=task, results_path=str(results))
+
+
+def cut_off_reply():
+    return RunResult(text='{"chosen": "A", "reason": "counting words (1) (2', input_tokens=1,
+                     output_tokens=900, latency_s=0.1, cost_usd=0.0, truncated=True)
+
+
+def good_reply():
+    return RunResult(text=verdict_json("A"), input_tokens=1, output_tokens=1,
+                     latency_s=0.1, cost_usd=0.0)
+
+
+def test_a_judge_reply_cut_off_at_the_limit_is_asked_again_once(tmp_path):
+    replies = [cut_off_reply(), good_reply()]
+    outcome = one_input_outcome(tmp_path)
+
+    judged = judge_check(outcome, run=lambda *args, **kwargs: replies.pop(0),
+                         verdicts_folder=tmp_path / "v", template=TEMPLATE)
+
+    assert judged == 1
+    assert replies == []
+
+
+def test_a_judge_that_is_always_cut_off_gives_a_clear_message(tmp_path):
+    outcome = one_input_outcome(tmp_path)
+
+    with pytest.raises(ValueError, match="cut off"):
+        judge_check(outcome, run=lambda *args, **kwargs: cut_off_reply(),
+                    verdicts_folder=tmp_path / "v", template=TEMPLATE)

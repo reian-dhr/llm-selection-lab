@@ -108,6 +108,9 @@ JUDGE_EXAMPLES = 3
 # Room for the judge's critiques and verdict, in tokens (kept low for Groq's free tier).
 JUDGE_MAX_TOKENS = 900
 
+# How many times the judge is asked about one input when its answer is cut off at that limit.
+JUDGE_ATTEMPTS = 2
+
 # How many inputs the position-swap test asks the judge about again (one judge call each).
 JUDGE_SWAP_MAX_INPUTS = 10
 

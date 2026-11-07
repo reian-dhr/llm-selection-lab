@@ -23,6 +23,7 @@ from model_selection_lab.judge.code_checks import merge_checks, run_code_checks
 from model_selection_lab.judge.picks import answers_by_input, load_picks, shown_order
 from model_selection_lab.models.model_client import run_model
 from model_selection_lab.settings import (
+    JUDGE_ATTEMPTS,
     JUDGE_EXAMPLES,
     JUDGE_MAX_TOKENS,
     JUDGE_MODEL,
@@ -189,10 +190,17 @@ def judge_input(
     prompt = build_judge_prompt(
         template, task_text, task_input.input, texts, rules, examples, broken
     )
-    result = run(JUDGE_MODEL, prompt, max_tokens=JUDGE_MAX_TOKENS)
-    if result.error is not None:
-        raise RuntimeError(f"The judge could not answer: {result.error}")
-    return parse_verdict(result.text, dict(zip(LETTERS, order)))
+    # A small judge sometimes rambles (counts words aloud) and hits the length limit: its
+    # answer is cut off. It is a chance event, so one more try usually works.
+    for _ in range(JUDGE_ATTEMPTS):
+        result = run(JUDGE_MODEL, prompt, max_tokens=JUDGE_MAX_TOKENS)
+        if result.error is not None:
+            raise RuntimeError(f"The judge could not answer: {result.error}")
+        if not result.truncated:
+            return parse_verdict(result.text, dict(zip(LETTERS, order)))
+    raise ValueError(
+        f"The judge's answer was cut off at {JUDGE_MAX_TOKENS} tokens, {JUDGE_ATTEMPTS} times."
+    )
 
 
 def task_text_of(task) -> str:
