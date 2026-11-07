@@ -1,4 +1,4 @@
-"""Remote store: a copy of the saved files in a private GitHub repository.
+"""Remote store: a copy of the saved files on a branch of a private GitHub repository.
 
 Online hosting (for example Streamlit Community Cloud) wipes local files when the app
 restarts. Local files stay the source of truth, and this module keeps a copy on GitHub:
@@ -6,8 +6,10 @@ restarts. Local files stay the source of truth, and this module keeps a copy on 
 - pull_picks(): when the app starts, download the picks and the answers they refer to, so
   the judge still learns from past preferences after a restart.
 
-It uses GitHub's REST API ("contents" endpoints) with a fine-grained token that can write to
-that one repository only. Nothing here runs unless a token and a repository are configured.
+The copy lives on its own branch (DATA_BRANCH in settings.py), so saving never touches the
+code on the main branch. It uses GitHub's REST API ("contents" endpoints) with a
+fine-grained token that can write to that one repository only. Nothing here runs unless a
+token and a repository are configured.
 """
 
 import base64
@@ -15,6 +17,8 @@ import json
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+from model_selection_lab.settings import DATA_BRANCH
 
 API = "https://api.github.com"
 PICKS_FOLDER = "data/picks"
@@ -46,21 +50,23 @@ def github_request(method: str, url: str, token: str, body: dict | None = None):
         return status, text
 
 
-def contents_url(repo: str, path: str) -> str:
-    """The API address of one file in the repository."""
-    return f"{API}/repos/{repo}/contents/{Path(path).as_posix()}"
+def contents_url(repo: str, path: str, branch: str = DATA_BRANCH) -> str:
+    """The API address of one file on a branch of the repository."""
+    return f"{API}/repos/{repo}/contents/{Path(path).as_posix()}?ref={branch}"
 
 
-def push_file(path: str, token: str, repo: str, http=github_request) -> None:
-    """Upload a local file to the same path in the repository, creating or replacing it.
+def push_file(path: str, token: str, repo: str, branch: str = DATA_BRANCH,
+              http=github_request) -> None:
+    """Upload a local file to the same path on the branch, creating or replacing it.
 
     http: only for tests, to use a fake instead of the network. Raises RuntimeError.
     """
-    url = contents_url(repo, path)
+    url = contents_url(repo, path, branch)
     status, existing = http("GET", url, token)
     body = {
         "message": f"Save {Path(path).name}",
         "content": base64.b64encode(Path(path).read_bytes()).decode(),
+        "branch": branch,
     }
     if status == 200:
         body["sha"] = existing["sha"]  # GitHub needs it to replace a file
@@ -69,9 +75,10 @@ def push_file(path: str, token: str, repo: str, http=github_request) -> None:
         raise RuntimeError(f"GitHub refused to save {path}: {status} {answer}")
 
 
-def download(path: str, token: str, repo: str, http=github_request) -> bool:
-    """Download one file from the repository to the same local path. False if missing."""
-    status, answer = http("GET", contents_url(repo, path), token)
+def download(path: str, token: str, repo: str, branch: str = DATA_BRANCH,
+             http=github_request) -> bool:
+    """Download one file from the branch to the same local path. False if missing."""
+    status, answer = http("GET", contents_url(repo, path, branch), token)
     if status != 200:
         return False
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -79,17 +86,17 @@ def download(path: str, token: str, repo: str, http=github_request) -> bool:
     return True
 
 
-def pull_picks(token: str, repo: str, http=github_request) -> int:
+def pull_picks(token: str, repo: str, branch: str = DATA_BRANCH, http=github_request) -> int:
     """Download every picks file and the results file of the same request. Returns how many
-    picks files were downloaded (0 if the repository is still empty)."""
-    status, listing = http("GET", contents_url(repo, PICKS_FOLDER), token)
+    picks files were downloaded (0 if the branch is still empty)."""
+    status, listing = http("GET", contents_url(repo, PICKS_FOLDER, branch), token)
     if status != 200:
         return 0
     pulled = 0
     for item in listing:
         if item.get("type") != "file" or not item["name"].endswith(".jsonl"):
             continue
-        download(f"{PICKS_FOLDER}/{item['name']}", token, repo, http)
-        download(f"{RESULTS_FOLDER}/{item['name']}", token, repo, http)
+        download(f"{PICKS_FOLDER}/{item['name']}", token, repo, branch, http)
+        download(f"{RESULTS_FOLDER}/{item['name']}", token, repo, branch, http)
         pulled += 1
     return pulled

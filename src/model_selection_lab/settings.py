@@ -70,6 +70,12 @@ WORDS_PER_PAGE = 500
 # The low and high cost figures are the estimate minus and plus this share (0.30 = 30%).
 COST_UNCERTAINTY = 0.30
 
+# --- Online storage ---
+
+# The branch of the GitHub repository where the web app keeps its saved requests and picks
+# when it runs online. A separate branch keeps these saves out of the code on "main".
+DATA_BRANCH = "data"
+
 # --- Picking the best answer ---
 
 # Fixed number that decides the shuffled order of answers in the web app (A, B, C, D), so

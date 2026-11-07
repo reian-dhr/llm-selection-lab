@@ -12,13 +12,16 @@ REPO = "someone/data"
 class FakeGitHub:
     """Answers GET and PUT on contents URLs like GitHub does, from a dict path -> bytes."""
 
-    def __init__(self, files=None, refuse_writes=False):
+    def __init__(self, files=None, refuse_writes=False, branch="data"):
         self.files = dict(files or {})
         self.refuse_writes = refuse_writes
+        self.branch = branch  # the only branch this fake repository has
         self.puts = []
 
     def __call__(self, method, url, token, body=None):
-        path = url.split("/contents/", 1)[1]
+        path, _, query = url.split("/contents/", 1)[1].partition("?ref=")
+        if method == "GET" and query != self.branch:
+            return 404, {"message": "No commit found for the ref"}
         if method == "PUT":
             self.puts.append(body)
             if self.refuse_writes:
@@ -46,6 +49,16 @@ def test_push_creates_a_new_file(tmp_path, monkeypatch):
 
     assert github.files["results/ask_1.jsonl"] == b'{"a": 1}\n'
     assert "sha" not in github.puts[0]
+
+
+def test_push_writes_to_the_data_branch(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "picks.jsonl").write_text("new\n")
+    github = FakeGitHub()
+
+    push_file("picks.jsonl", "token", REPO, http=github)
+
+    assert github.puts[0]["branch"] == "data"
 
 
 def test_push_replaces_an_existing_file_with_its_sha(tmp_path, monkeypatch):
@@ -89,7 +102,14 @@ def test_pull_from_an_empty_repository_does_nothing(tmp_path, monkeypatch):
     assert pull_picks("token", REPO, http=FakeGitHub()) == 0
 
 
+def test_pull_ignores_other_branches(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    github = FakeGitHub({"data/picks/ask_1.jsonl": b"pick\n"}, branch="main")
+
+    assert pull_picks("token", REPO, http=github) == 0
+
+
 def test_contents_url():
     assert contents_url(REPO, "data/picks/x.jsonl") == (
-        "https://api.github.com/repos/someone/data/contents/data/picks/x.jsonl"
+        "https://api.github.com/repos/someone/data/contents/data/picks/x.jsonl?ref=data"
     )
