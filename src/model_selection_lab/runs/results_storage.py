@@ -46,6 +46,7 @@ class ResultRecord:
     model_id: str = ""
     input_price_per_mtok: float = 0.0
     output_price_per_mtok: float = 0.0
+    prompt: str = ""  # the exact text sent to the model (empty in older lines)
 
 
 def fingerprint_call(prompt: str, model_key: str, models: dict = MODELS) -> str:
@@ -73,9 +74,10 @@ def make_record(
     result: RunResult,
     prompt_hash: str = "",
     model: ModelInfo | None = None,
+    prompt: str = "",
 ) -> ResultRecord:
     """Combine the labels of a call with its RunResult, and add the current time and, if the
-    model is given, its ID and prices."""
+    model is given, its ID and prices, and the prompt that was sent."""
     return ResultRecord(
         task_name=task_name,
         input_id=input_id,
@@ -92,6 +94,7 @@ def make_record(
         model_id=model.model_id if model else "",
         input_price_per_mtok=model.input_price_per_mtok if model else 0.0,
         output_price_per_mtok=model.output_price_per_mtok if model else 0.0,
+        prompt=prompt,
     )
 
 

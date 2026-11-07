@@ -104,6 +104,9 @@ JUDGE_EXAMPLES = 3
 # Room for the judge's critiques and verdict, in tokens (kept low for Groq's free tier).
 JUDGE_MAX_TOKENS = 900
 
+# How many inputs the position-swap test asks the judge about again (one judge call each).
+JUDGE_SWAP_MAX_INPUTS = 10
+
 # The judge's instructions. The private file is used if it exists, otherwise the generic
 # one from examples/ (the same rule applies to the drafting prompt).
 JUDGE_PROMPT = "data/prompts/judge.md"

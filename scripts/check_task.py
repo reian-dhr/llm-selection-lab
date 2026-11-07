@@ -57,4 +57,6 @@ if __name__ == "__main__":
         print("\n2. Running the test on the models...\n")
         outcome = finish_check(outcome, max_cost_usd=arguments.max_cost)
         print("\n3. Summary per model and recommendation:\n")
-        print(format_report(outcome.summary, outcome.recommendation, outcome.results_path))
+        print(format_report(
+            outcome.summary, outcome.recommendation, outcome.results_path, outcome.judge_error
+        ))

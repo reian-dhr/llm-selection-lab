@@ -6,10 +6,12 @@ Python objects, so the rest of the code can write task.instruction instead of
 digging through dictionaries.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+from model_selection_lab.judge.code_checks import validate_checks
 
 
 @dataclass
@@ -17,9 +19,10 @@ class TaskInput:
     """One test case of a task."""
 
     id: str  # short unique name, used to label the saved results
-    difficulty: str  # "easy" or "hard"
     input: str  # the facts or text the model has to work with
-    reference: str | None  # an ideal answer, None if we have not written one
+    difficulty: str = ""  # "easy" or "hard", optional
+    reference: str | None = None  # an ideal answer, optional
+    checks: dict = field(default_factory=dict)  # rules for this input, see code_checks.py
 
 
 @dataclass
@@ -30,10 +33,11 @@ class Task:
     description: str  # what a good answer looks like, used later by the judge
     instruction: str  # what every model is told
     inputs: list[TaskInput]
+    checks: dict = field(default_factory=dict)  # rules for every input, see code_checks.py
 
 
 TASK_FIELDS = ("name", "description", "instruction", "inputs")
-INPUT_FIELDS = ("id", "difficulty", "input", "reference")
+INPUT_FIELDS = ("id", "input")
 
 
 def check_fields(data: dict, fields: tuple, label: str) -> None:
@@ -80,15 +84,21 @@ def parse_task(data, path: str) -> Task:
     if not isinstance(data["inputs"], list) or not data["inputs"]:
         raise ValueError(f"Task file {path}: inputs must be a non-empty list")
 
+    task_checks = data.get("checks") or {}
+    validate_checks(task_checks, f"Task file {path}")
     inputs = []
     for number, item in enumerate(data["inputs"], start=1):
-        check_fields(item, INPUT_FIELDS, f"Input {number} in {path}")
+        where = f"Input {number} in {path}"
+        check_fields(item, INPUT_FIELDS, where)
+        input_checks = item.get("checks") or {}
+        validate_checks(input_checks, where)
         inputs.append(
             TaskInput(
                 id=item["id"],
-                difficulty=item["difficulty"],
                 input=item["input"],
-                reference=item["reference"],
+                difficulty=item.get("difficulty") or "",
+                reference=item.get("reference"),
+                checks=input_checks,
             )
         )
     return Task(
@@ -96,4 +106,5 @@ def parse_task(data, path: str) -> Task:
         description=data["description"],
         instruction=data["instruction"],
         inputs=inputs,
+        checks=task_checks,
     )

@@ -28,7 +28,7 @@ cost estimate, refused above the cap        helper drafts a test (3 inputs, one 
 every standard model answers                cost preview (free), then run on every model
    |                                            |
    v                                            v
-judge picks the best (sees A-D, no names)   summary: cost, speed, failures, recommendation
+judge picks the best (sees A-D, no names)   summary: cost, speed, quality, failures
    |
    v
 best answer shown, others one click away
@@ -37,8 +37,9 @@ best answer shown, others one click away
 ```
 
 Both flows share the same runner (`runs/`), unified model client (`models/`) and
-storage. Only the web app uses the judge (`judge/`) so far: a check compares cost and
-speed, and saves every answer in `results/` to read.
+storage. Both use the judge (`judge/`): in a check, code checks flag broken rules first, then
+the judge rates the answers, and the summary reports cost, speed and quality. Every answer is
+saved in `results/` to read.
 
 ## Design decisions
 
@@ -121,10 +122,10 @@ access to one private data repository) and `data_repo`. See
   shows the answers unranked.
 - Rules are written by hand. Next: when the judge disagrees with a pick, propose a rule
   change for the user to approve.
-- The check flow (command line and MCP) does not judge quality yet: it compares cost
-  and speed, and the answers are saved for you to read.
-- The sign-in lock counts wrong tries per browser session; it is not a rate limit.
-  Each request still has its spending cap.
+- In a check, the judge's verdicts are not yet compared with your own picks (picks are made
+  in the web app).
+- Five wrong sign-ins lock the whole app for five minutes. Each request still has its
+  spending cap.
 
 ## Learn more
 

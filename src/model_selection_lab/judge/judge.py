@@ -9,7 +9,7 @@ The judge does not train. It improves because every new pick you make becomes an
 for the next judgement. agreement() measures how often it matched your picks. In the web
 app its pick is shown first, so your preference is given after seeing it.
 
-Verdicts for one check are kept in data/verdicts/<check>.jsonl, one line per input.
+Verdicts for one run are kept in data/verdicts/<results file name>.jsonl, one line per input.
 """
 
 import json
@@ -19,6 +19,7 @@ from pathlib import Path
 
 import yaml
 
+from model_selection_lab.judge.code_checks import merge_checks, run_code_checks
 from model_selection_lab.judge.picks import answers_by_input, load_picks, shown_order
 from model_selection_lab.models.model_client import run_model
 from model_selection_lab.settings import (
@@ -28,6 +29,7 @@ from model_selection_lab.settings import (
     JUDGE_PROMPT,
     JUDGE_PROMPT_EXAMPLE,
     JUDGE_RULES_FOLDER,
+    JUDGE_SWAP_MAX_INPUTS,
 )
 from model_selection_lab.text_files import read_records, read_text
 
@@ -105,10 +107,17 @@ def recent_examples(
     return "\n\n".join(examples) or "No past choices yet."
 
 
-def build_judge_prompt(template, task_text, input_text, answers_in_order, rules, examples):
-    """Fill the judge's template. answers_in_order: the answer texts in A, B, C... order."""
+def build_judge_prompt(
+    template, task_text, input_text, answers_in_order, rules, examples, rule_failures=None
+):
+    """Fill the judge's template. answers_in_order: the answer texts in A, B, C... order.
+    rule_failures: for each answer, the code checks it broke (see code_checks.py), in the
+    same order. The judge is told, because a broken rule is a fact it should weigh."""
+    rule_failures = rule_failures or [[] for _ in answers_in_order]
     answers = "\n\n".join(
-        f"Answer {LETTERS[number]}:\n{text}" for number, text in enumerate(answers_in_order)
+        f"Answer {LETTERS[number]}:\n{text}"
+        + (f"\n[Automatic check failed: {'; '.join(broken)}]" if broken else "")
+        for number, (text, broken) in enumerate(zip(answers_in_order, rule_failures))
     )
     filled = {
         "{{TASK}}": task_text,
@@ -163,6 +172,32 @@ def load_verdicts(path: str) -> dict:
     return verdicts
 
 
+def judge_input(
+    task, task_input, answers: dict, order: list, template, task_text, rules, examples, run
+) -> dict:
+    """Ask the judge about one input, with the answers shown in the given order.
+
+    answers: model_key -> saved line, for this input. Returns the parsed verdict (see
+    parse_verdict). Raises RuntimeError if the judge could not answer, ValueError if it
+    answered in an unusable way or there are more answers than letters.
+    """
+    if len(order) > len(LETTERS):
+        raise ValueError(f"The judge can compare at most {len(LETTERS)} answers, got {len(order)}.")
+    texts = [answers[model]["text"] for model in order]
+    checks = merge_checks(task.checks, task_input.checks)
+    broken = [run_code_checks(text, checks) for text in texts]
+    prompt = build_judge_prompt(template, task_text, task_input.input, texts, rules, examples, broken)
+    result = run(JUDGE_MODEL, prompt, max_tokens=JUDGE_MAX_TOKENS)
+    if result.error is not None:
+        raise RuntimeError(f"The judge could not answer: {result.error}")
+    return parse_verdict(result.text, dict(zip(LETTERS, order)))
+
+
+def task_text_of(task) -> str:
+    """What the judge is told about the task: what good looks like, and the instruction."""
+    return f"{task.description}\n\nInstruction given to the models:\n{task.instruction}"
+
+
 def judge_check(outcome, run=run_model, verdicts_folder: str = "data/verdicts", template=None):
     """Judge every input of a run that has no verdict yet. Returns the number judged.
 
@@ -171,12 +206,10 @@ def judge_check(outcome, run=run_model, verdicts_folder: str = "data/verdicts", 
     """
     if template is None:
         template = read_text(JUDGE_PROMPT, JUDGE_PROMPT_EXAMPLE)
-    path = verdicts_path_for(outcome.task.name, verdicts_folder)
+    # Named after the run (the results file), so a new run is never judged from old verdicts.
+    path = verdicts_path_for(Path(outcome.results_path).stem, verdicts_folder)
     done = load_verdicts(path)
-    task_text = (
-        f"{outcome.task.description}\n\n"
-        f"Instruction given to the models:\n{outcome.task.instruction}"
-    )
+    task_text = task_text_of(outcome.task)
     rules = load_rules(task_text)
     examples = recent_examples(exclude_check=outcome.task.name)
     answers = answers_by_input(outcome.results_path)
@@ -184,26 +217,16 @@ def judge_check(outcome, run=run_model, verdicts_folder: str = "data/verdicts", 
     for task_input in outcome.task.inputs:
         if task_input.id in done or task_input.id not in answers:
             continue
-        if len(answers[task_input.id]) > len(LETTERS):
-            raise ValueError(
-                f"The judge can compare at most {len(LETTERS)} answers, "
-                f"got {len(answers[task_input.id])}."
-            )
         order = shown_order(task_input.id, list(answers[task_input.id]))
-        letter_to_model = dict(zip(LETTERS, order))
-        prompt = build_judge_prompt(
-            template, task_text, task_input.input,
-            [answers[task_input.id][model]["text"] for model in order], rules, examples,
-        )
-        result = run(JUDGE_MODEL, prompt, max_tokens=JUDGE_MAX_TOKENS)
-        if result.error is not None:
-            raise RuntimeError(f"The judge could not answer: {result.error}")
         verdict = Verdict(
             input_id=task_input.id,
             judge_model=JUDGE_MODEL,
             timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
             results_file=outcome.results_path,
-            **parse_verdict(result.text, letter_to_model),
+            **judge_input(
+                outcome.task, task_input, answers[task_input.id], order,
+                template, task_text, rules, examples, run,
+            ),
         )
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as file:
@@ -212,13 +235,68 @@ def judge_check(outcome, run=run_model, verdicts_folder: str = "data/verdicts", 
     return judged
 
 
+def swap_test(
+    outcome, run=run_model, verdicts_folder: str = "data/verdicts", template=None,
+    limit: int = JUDGE_SWAP_MAX_INPUTS,
+) -> dict:
+    """Ask the judge again about inputs it already judged, with the answers in reverse order.
+
+    A judge that follows the content picks the same model both times. One with position
+    bias flips with the order. Returns how many inputs were tested, how many gave the same
+    pick, and how many times it chose the answer shown first in both orders.
+    Costs one judge call per input tested (at most `limit`).
+    """
+    if template is None:
+        template = read_text(JUDGE_PROMPT, JUDGE_PROMPT_EXAMPLE)
+    verdicts = load_verdicts(verdicts_path_for(Path(outcome.results_path).stem, verdicts_folder))
+    task_text = task_text_of(outcome.task)
+    rules = load_rules(task_text)
+    examples = recent_examples(exclude_check=outcome.task.name)
+    answers = answers_by_input(outcome.results_path)
+    tested = consistent = always_first = 0
+    for task_input in outcome.task.inputs:
+        verdict = verdicts.get(task_input.id)
+        if tested == limit or verdict is None or verdict.chosen_model is None:
+            continue
+        order = shown_order(task_input.id, list(answers[task_input.id]))
+        reversed_order = order[::-1]
+        swapped = judge_input(
+            outcome.task, task_input, answers[task_input.id], reversed_order,
+            template, task_text, rules, examples, run,
+        )["chosen_model"]
+        tested += 1
+        consistent += swapped == verdict.chosen_model
+        always_first += verdict.chosen_model == order[0] and swapped == reversed_order[0]
+    return {"tested": tested, "consistent": consistent, "always_first": always_first}
+
+
+def wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float, float]:
+    """The range the true rate probably lies in (95% by default), given `successes` out of
+    `total`. With few cases it is wide, which is the point: 1 of 2 says very little."""
+    if total == 0:
+        return 0.0, 1.0
+    rate = successes / total
+    centre = (rate + z * z / (2 * total)) / (1 + z * z / total)
+    spread = z * ((rate * (1 - rate) / total + z * z / (4 * total * total)) ** 0.5) / (
+        1 + z * z / total
+    )
+    return centre - spread, centre + spread
+
+
 def agreement(picks_folder: str = "data/picks", verdicts_folder: str = "data/verdicts") -> dict:
-    """Across all checks: on how many inputs the judge chose the same answer as you."""
+    """Across all checks: on how many inputs the judge chose the same answer as you.
+
+    Also gives `chance`, how many a judge choosing at random would have matched on average,
+    and `low` and `high`, the range the true agreement rate probably lies in.
+    """
     compared = agreed = 0
+    chance = 0.0
     for verdicts_path in Path(verdicts_folder).glob("*.jsonl"):
         picks = load_picks(Path(picks_folder) / verdicts_path.name)
         for input_id, verdict in load_verdicts(verdicts_path).items():
             if input_id in picks:
                 compared += 1
                 agreed += verdict.chosen_model == picks[input_id].chosen_model
-    return {"compared": compared, "agreed": agreed}
+                chance += 1 / max(len(picks[input_id].shown_order), 1)
+    low, high = wilson_interval(agreed, compared)
+    return {"compared": compared, "agreed": agreed, "chance": chance, "low": low, "high": high}

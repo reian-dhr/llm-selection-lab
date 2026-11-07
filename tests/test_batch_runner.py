@@ -252,3 +252,12 @@ def test_a_cap_reached_early_stops_calls_that_have_not_started(tmp_path, capsys)
 
     assert len(read_lines(path)) == 1
     assert "STOPPED" in capsys.readouterr().out
+
+
+def test_run_task_saves_the_exact_prompt_sent_with_each_answer(tmp_path):
+    path = tmp_path / "run.jsonl"
+
+    run_task(TASK, ["model-a"], path, run=fake_run)
+
+    prompts = {line["input_id"]: line["prompt"] for line in read_lines(path)}
+    assert prompts["easy_01"] == build_prompt(TASK.instruction, "The cat sat.")

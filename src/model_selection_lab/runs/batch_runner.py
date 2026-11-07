@@ -148,17 +148,17 @@ def run_task(
     dropped = 0
     with ThreadPoolExecutor(max_workers=parallel_calls) as pool:
         waiting = {
-            pool.submit(attempt, model_key, prompt): (input_id, model_key, prompt_hash)
+            pool.submit(attempt, model_key, prompt): (input_id, model_key, prompt, prompt_hash)
             for input_id, model_key, prompt, prompt_hash in to_call
         }
         for future in as_completed(waiting):
-            input_id, model_key, prompt_hash = waiting[future]
+            input_id, model_key, prompt, prompt_hash = waiting[future]
             result = future.result()
             if result is None:
                 dropped += 1
                 continue
             record = make_record(
-                task.name, input_id, model_key, result, prompt_hash, models.get(model_key)
+                task.name, input_id, model_key, result, prompt_hash, models.get(model_key), prompt
             )
             append_result(output_path, record)
 

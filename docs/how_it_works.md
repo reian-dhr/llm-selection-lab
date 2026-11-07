@@ -17,9 +17,9 @@ request --> every standard model answers --> judge picks the best --> best answe
 
 The command line (`scripts/check_task.py`) and the MCP server (`mcp_server.py`) run a fuller
 check of a kind of task: a helper drafts a test with three inputs (one with a trap), the
-models answer each, and a summary compares cost and speed. Both flows reuse the same runner
-and storage; only the web app runs the judge so far, so a check's answers are saved in
-`results/` for you to read.
+models answer each, code checks flag broken rules, the judge rates the answers, and a summary
+compares cost, speed and quality. Both flows reuse the same runner and storage; every answer
+is also saved in `results/` for you to read.
 
 ## 2. The web app
 
@@ -57,6 +57,7 @@ src/model_selection_lab/
   judge/
     picks.py             picks (the preferred answer and why), saved per request or check
     judge.py             the judge: prompt, verdicts, agreement with the picks
+    code_checks.py       rules a machine verifies first: word limit, must include, valid JSON
   report/
     summary.py           one row per model; recommendation on cost and speed
     job_cost.py          estimated cost of one larger, real job per model
@@ -64,6 +65,7 @@ scripts/
   check_task.py          a whole check from the terminal
   run_task.py            run a hand-written task file
   estimate_job_cost.py   cost of a larger job, from a run's results
+  judge_reliability.py   agreement with your picks (with chance level and range); position swap
   make_password_hash.py  create the login's username and password hash
 examples/                generic prompts and an example task, used when private ones are missing
 tests/                   one test file per module, fakes only: no network, no cost
@@ -79,6 +81,19 @@ instructions for coding agents.
 facts it is missing, what a good answer looks like, the instruction, and three inputs (one
 hard, with a trap). The same checks as for hand-written tasks apply; an invalid answer is
 retried once, with the problem explained. It answers in JSON, which quotes every text.
+
+**Code checks before opinions.** A task can list rules a machine can verify: `max_words`,
+`must_include`, `must_not_include`, `valid_json`, on the task or on one input (see
+`examples/tasks/example_summary.yaml`). An answer that breaks one is counted in the summary
+(`rules_broken`) and the model is left out of the recommendation, whatever a judge would
+say: a missing number is a fact, not an opinion. A misspelt rule is an error when the task
+is loaded, so a typo cannot silently disable a check.
+
+**Measuring the judge.** `scripts/judge_reliability.py` reports how often the judge chose
+the answer you chose, next to what a random judge would match and the range the true rate
+probably lies in (with few picks the range is wide: it says so instead of hiding it). With
+`--swap` it asks the judge again with the answers in reverse order: a judge that follows the
+content picks the same model both times, one with position bias flips with the order.
 
 **Helper and judge from outside the comparison.** Both are Qwen 3.8 (Alibaba, open weights)
 on Groq's free tier, with the tier `helper`, so they never compete and cannot favour their
@@ -154,5 +169,6 @@ picks, create a private GitHub repository for the data and a fine-grained token 
   `TASK_DRAFTER_MODEL` and `JUDGE_MODEL` in `settings.py` if needed.
 - Later: daily spending cap, rate limits, judge notes ("the judge was wrong because"),
   agreement over time, Google login, the job cost in the app.
-- The check flow (command line and MCP) does not run the judge yet.
+- In a check, the judge's verdicts are kept per run and are not compared with your picks
+  (picks are made in the web app).
 - Refusals by a model are saved as empty answers, without a warning.

@@ -52,7 +52,9 @@ def describe_preview(outcome) -> str:
 
 def describe_run(outcome) -> str:
     """The summary table and the recommendation, as text."""
-    report = format_report(outcome.summary, outcome.recommendation, outcome.results_path)
+    report = format_report(
+        outcome.summary, outcome.recommendation, outcome.results_path, outcome.judge_error
+    )
     return f"Results saved to: {outcome.results_path}\n\n{report}"
 
 
@@ -67,8 +69,8 @@ def preview_check(description: str) -> str:
 
 @server.tool()
 def run_check(task_path: str) -> str:
-    """Run a previewed test on the standard models and return cost, speed and a
-    recommendation. Costs money: only call it after the user agreed to the preview."""
+    """Run a previewed test on the standard models and return cost, speed, quality (a judge
+    rates the answers) and a recommendation. Costs money: only call it after the user agreed to the preview."""
     if not is_task_file(task_path):
         return f"Refused: {task_path} is not a test file in {' or '.join(TASK_FOLDERS)}."
     outcome = check.load_check(task_path)

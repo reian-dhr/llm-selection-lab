@@ -123,3 +123,13 @@ def test_premium_models_answer_only_when_asked(tmp_path):
     assert set(standard.answers) == set(select_models())
     assert set(premium.answers) == set(select_models(include_premium=True))
     assert set(premium.answers) > set(standard.answers)
+
+
+def test_a_judge_that_cannot_even_start_still_returns_the_answers(tmp_path):
+    def no_key(model_key, prompt, max_tokens):
+        raise OSError("The api_key client option must be set")  # not a RuntimeError
+
+    outcome = ask("Write a haiku.", run=fake_run, judge_run=no_key, **folders(tmp_path))
+
+    assert outcome.answers and outcome.best_model is None
+    assert "api_key" in outcome.judge_error

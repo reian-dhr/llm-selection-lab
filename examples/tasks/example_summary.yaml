@@ -6,15 +6,23 @@ description: >
 instruction: |
   Summarise the announcement below in at most three sentences for a busy reader. State the
   main change first, keep every number exactly as given, and add nothing that is not in it.
+# Code checks: rules a machine can verify, applied to every answer before any judge reads it.
+# Rules here apply to every input; an input can add its own (see docs/how_it_works.md).
+checks:
+  max_words: 90
 inputs:
   - id: easy_01
     difficulty: easy
+    checks:
+      must_include: ["62%", "1,400"]
     input: |
       The city library (invented) will open on Sundays from 1 March, from 10:00 to 16:00.
       The change follows a survey in which 62% of 1,400 members asked for weekend hours.
     reference: null
   - id: hard_01
     difficulty: hard
+    checks:
+      must_include: ["10:00", "11:00"]  # the two conflicting opening times must both appear
     input: |
       The city library (invented) will open on Sundays from 1 March. A notice on the door
       says from 10:00 to 16:00; the website says from 11:00 to 16:00. Parking stays free.

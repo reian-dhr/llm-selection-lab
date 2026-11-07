@@ -91,3 +91,66 @@ def test_the_latest_run_is_the_newest_file_whatever_its_name_style(tmp_path):
     os.utime(new, (2_000, 2_000))
 
     assert latest_run("task_x", tmp_path) == str(new)
+
+
+def test_models_that_break_a_code_check_are_counted_and_left_out(tmp_path):
+    drafted_with_rule = DRAFTED.replace(
+        "inputs:", "checks:\n  must_include: [\"answer from haiku\"]\ninputs:", 1
+    )
+
+    def run(model_key, prompt, max_tokens):
+        result = fake_run(model_key, prompt, max_tokens)
+        if prompt.startswith("Write "):
+            result.text = drafted_with_rule
+        return result
+
+    outcome = run_check(
+        "Summarise texts.", run=run, template=TEMPLATE,
+        tasks_folder=tmp_path / "tasks", results_folder=tmp_path / "results",
+    )
+
+    assert outcome.summary.loc["haiku-5-5", "rules_broken"] == 0
+    others = outcome.summary.drop(index="haiku-5-5")
+    assert (others["rules_broken"] == 1).all()
+    assert any("broken rules" in line for line in outcome.recommendation)
+
+
+JUDGE_VERDICT = '{"chosen": "A", "reason": "best", "critiques": {}, "refused": []}'
+
+
+def judge_aware_run(model_key, prompt, max_tokens):
+    """Like fake_run, but the judge (it gets THE ANSWERS in its prompt) returns a verdict."""
+    result = fake_run(model_key, prompt, max_tokens)
+    if "Answer A:" in prompt:
+        result.text = JUDGE_VERDICT
+    return result
+
+
+def test_a_check_asks_the_judge_and_reports_quality(tmp_path):
+    outcome = run_check(
+        "Summarise texts.", run=judge_aware_run, template=TEMPLATE, judge_template="{{ANSWERS}}",
+        tasks_folder=tmp_path / "tasks", results_folder=tmp_path / "results",
+        verdicts_folder=tmp_path / "verdicts",
+    )
+
+    assert outcome.judge_error == ""
+    assert outcome.summary["judge_wins"].sum() == 1  # one input, one winner
+    assert any(line.startswith("Best quality:") for line in outcome.recommendation)
+
+
+def test_a_busy_judge_leaves_the_check_without_quality_but_does_not_fail_it(tmp_path):
+    def busy_judge_run(model_key, prompt, max_tokens):
+        result = fake_run(model_key, prompt, max_tokens)
+        if "Answer A:" in prompt:
+            result.error = "RateLimitError: busy"
+        return result
+
+    outcome = run_check(
+        "Summarise texts.", run=busy_judge_run, template=TEMPLATE, judge_template="{{ANSWERS}}",
+        tasks_folder=tmp_path / "tasks", results_folder=tmp_path / "results",
+        verdicts_folder=tmp_path / "verdicts",
+    )
+
+    assert "busy" in outcome.judge_error
+    assert "judge_wins" not in outcome.summary.columns
+    assert any(line.startswith("Cheapest:") for line in outcome.recommendation)

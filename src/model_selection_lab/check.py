@@ -6,10 +6,11 @@
 Every step already exists elsewhere; this file only puts them in order. It has two parts,
 so the user sees the drafted test and its cost before any compared model is called:
 - prepare_check(): draft the test and estimate the cost (only the free helper is called),
-- finish_check(): run the test on the models, then summarise and recommend.
+- finish_check(): run the test on the models, ask the judge, then summarise and recommend.
 run_check() does both in one call. list_checks() and load_check() bring past checks back.
 """
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -17,9 +18,10 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from model_selection_lab.judge.judge import judge_check, load_verdicts, verdicts_path_for
 from model_selection_lab.models.model_client import run_model
 from model_selection_lab.models.model_registry import MODELS, select_models
-from model_selection_lab.report.summary import recommend, summarise
+from model_selection_lab.report.summary import recommend, summarise, with_rule_failures
 from model_selection_lab.runs.batch_runner import estimate_max_cost, run_task
 from model_selection_lab.runs.results_storage import load_reusable_answers
 from model_selection_lab.runs.task_drafter import GENERATED_FOLDER, draft_task, save_drafted_task
@@ -40,6 +42,7 @@ class CheckOutcome:
     results_path: str | None = None  # None if the check stopped at the preview
     summary: pd.DataFrame | None = None  # one row per model
     recommendation: list[str] | None = None  # short sentences
+    judge_error: str = ""  # why the judge could not rate the answers; empty if it did
 
 
 def prepare_check(
@@ -76,23 +79,49 @@ def finish_check(
     max_cost_usd: float = MAX_RUN_COST_USD,
     run=run_model,
     results_folder: str = "results",
+    judge_run=None,
+    judge_template: str | None = None,
+    verdicts_folder: str = "data/verdicts",
 ) -> CheckOutcome:
-    """Run the prepared test on the models, then add the summary and the recommendation."""
+    """Run the prepared test on the models, ask the judge, then add the summary and the
+    recommendation.
+
+    The judge is a free helper model and may be busy: then the check still ends, without
+    quality, and says why in judge_error. judge_run defaults to run (tests pass fakes).
+    """
     task, model_keys, reusable = outcome.task, outcome.model_keys, outcome.reusable
     outcome.results_path = run_path_for(task.name, results_folder)
     run_task(
         task, model_keys, outcome.results_path, run=run,
         max_cost_usd=max_cost_usd, reusable=reusable,
     )
-    outcome.summary = summarise_in_order(outcome.results_path, model_keys)
-    outcome.recommendation = recommend(outcome.summary)
+    try:
+        judge_check(
+            outcome, run=judge_run or run, verdicts_folder=verdicts_folder, template=judge_template
+        )
+    except Exception as problem:  # busy, key missing...: the check is still worth reporting
+        outcome.judge_error = str(problem)
+    add_summary(outcome, verdicts_folder)
     return outcome
 
 
-def summarise_in_order(results_path: str, model_keys: list[str]) -> pd.DataFrame:
-    """The summary of a results file, one row per model, in the order of model_keys.
-    Answers are saved as they arrive, so the file itself is in no useful order."""
-    summary = summarise(pd.read_json(results_path, lines=True))
+def add_summary(outcome: CheckOutcome, verdicts_folder: str = "data/verdicts") -> None:
+    """Fill the summary and the recommendation from the results file, and from the judge's
+    verdicts for this run if there are any (then each model gets a judge_wins count)."""
+    outcome.summary = summarise_in_order(outcome.results_path, outcome.model_keys, outcome.task)
+    verdicts = load_verdicts(verdicts_path_for(Path(outcome.results_path).stem, verdicts_folder))
+    if verdicts:
+        wins = Counter(verdict.chosen_model for verdict in verdicts.values())
+        outcome.summary["judge_wins"] = [wins.get(key, 0) for key in outcome.summary.index]
+    outcome.recommendation = recommend(outcome.summary, judged_inputs=len(verdicts))
+
+
+def summarise_in_order(results_path: str, model_keys: list[str], task: Task) -> pd.DataFrame:
+    """The summary of a results file, one row per model, in the order of model_keys, with the
+    task's code checks applied. Answers are saved as they arrive, so the file itself is in no
+    useful order."""
+    results = with_rule_failures(pd.read_json(results_path, lines=True), task)
+    summary = summarise(results)
     return summary.loc[[key for key in model_keys if key in summary.index]]
 
 
@@ -106,6 +135,8 @@ def run_check(
     template: str | None = None,
     tasks_folder: str = GENERATED_FOLDER,
     results_folder: str = "results",
+    judge_template: str | None = None,
+    verdicts_folder: str = "data/verdicts",
 ) -> CheckOutcome:
     """The whole chain in one call: prepare, then (unless preview_only) finish."""
     outcome = prepare_check(
@@ -113,7 +144,10 @@ def run_check(
     )
     if preview_only:
         return outcome
-    return finish_check(outcome, max_cost_usd, run, results_folder)
+    return finish_check(
+        outcome, max_cost_usd, run, results_folder,
+        judge_template=judge_template, verdicts_folder=verdicts_folder,
+    )
 
 
 def run_path_for(task_name: str, results_folder: str = "results") -> str:
@@ -147,7 +181,9 @@ def list_checks(tasks_folder: str = GENERATED_FOLDER, results_folder: str = "res
     return checks
 
 
-def load_check(task_path: str, results_folder: str = "results") -> CheckOutcome:
+def load_check(
+    task_path: str, results_folder: str = "results", verdicts_folder: str = "data/verdicts"
+) -> CheckOutcome:
     """Rebuild a past check from its saved files, with its latest run if there is one."""
     drafted = yaml.safe_load(Path(task_path).read_text(encoding="utf-8"))
     task = load_task(task_path)
@@ -171,7 +207,6 @@ def load_check(task_path: str, results_folder: str = "results") -> CheckOutcome:
     )
     if results_path is not None:
         outcome.results_path = results_path
-        outcome.summary = summarise_in_order(results_path, model_keys)
-        outcome.recommendation = recommend(outcome.summary)
+        add_summary(outcome, verdicts_folder)
     return outcome
 

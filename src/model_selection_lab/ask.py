@@ -107,7 +107,7 @@ def ask(
     judge_error = ""
     try:
         judge_check(outcome, run=judge_run, verdicts_folder=verdicts_folder)
-    except (RuntimeError, ValueError) as problem:  # for example the free tier is busy
+    except Exception as problem:  # the free tier is busy, or its key is missing: keep the answers
         judge_error = str(problem)
     verdict = load_verdicts(verdicts_path_for(name, verdicts_folder)).get(INPUT_ID)
     # The same shuffled order the judge saw (see judge_check), to turn letters into names.
