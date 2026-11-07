@@ -19,6 +19,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pandas as pd
+
 from model_selection_lab.models.call_result import RunResult
 from model_selection_lab.models.model_registry import MODELS, ModelInfo
 from model_selection_lab.settings import MAX_ANSWER_TOKENS, THINKING_EXTRA_TOKENS
@@ -40,7 +42,8 @@ class ResultRecord:
     cost_usd: float
     error: str | None  # None means the call succeeded
     truncated: bool  # True if the answer was cut off at the length limit
-    prompt_hash: str  # fingerprint of the exact call (prompt, model, settings), see fingerprint_call()
+    # fingerprint of the exact call (prompt, model, settings), see fingerprint_call()
+    prompt_hash: str
     # What the call was priced with, so cost_usd can be checked after prices change.
     # Empty or 0 in lines saved before these fields existed.
     model_id: str = ""
@@ -133,3 +136,11 @@ def load_reusable_answers(results_folder: str, task_name: str, max_age_days: int
             if key not in reusable or line["timestamp"] > reusable[key].timestamp:
                 reusable[key] = ResultRecord(**line)
     return reusable
+
+
+def read_results(path: str) -> pd.DataFrame:
+    """Read a results file as a table, one row per saved answer.
+
+    Types are not guessed: left to itself pandas turns a column of answers such as "42" into
+    numbers, and every text rule then fails on a number."""
+    return pd.read_json(path, lines=True, dtype=False)

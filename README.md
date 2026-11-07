@@ -71,6 +71,9 @@ saved in `results/` to read.
   not, and cut-off answers are flagged. A busy judge still leaves the user with the answers.
 - **One unified call, official SDKs only.** `run_model()` hides the differences between
   providers. No LangChain or LlamaIndex: the primitives stay visible.
+- **What is saved.** Each answer is saved with the exact prompt that produced it, the model
+  ID and the prices used. Online, these files (your requests included) are copied to a branch
+  of your private repository, so use a private repository and public or synthetic data only.
 - **Online without a database.** Local JSONL files are the source of truth; online, each new
   file is copied to a private GitHub repository, and past picks are downloaded at start.
 - **Prompts and rules are data, not code.** They are loaded from files at run time, with

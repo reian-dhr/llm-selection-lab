@@ -1,13 +1,17 @@
 """Tests for results_storage.py: saving results as lines in a .jsonl file."""
 
 import json
-
-from model_selection_lab.models.call_result import RunResult
 from dataclasses import replace
 
+from model_selection_lab.models.call_result import RunResult
 from model_selection_lab.models.model_registry import ModelInfo
 from model_selection_lab.runs import results_storage
-from model_selection_lab.runs.results_storage import append_result, fingerprint_call, make_record
+from model_selection_lab.runs.results_storage import (
+    append_result,
+    fingerprint_call,
+    make_record,
+    read_results,
+)
 
 SUCCESS = RunResult(
     text="Revenue grew 17%\n- bullet",
@@ -108,3 +112,18 @@ def test_lines_saved_before_these_fields_existed_still_load(tmp_path):
     reusable = results_storage.load_reusable_answers(tmp_path, "t", max_age_days=30)
 
     assert reusable[("easy_01", "m", "abc")].model_id == ""
+
+
+def test_answers_that_look_like_numbers_stay_text_when_results_are_read_back(tmp_path):
+    path = tmp_path / "run.jsonl"
+    for model in ("model-a", "model-b"):
+        append_result(path, make_record("t", "easy_01", model, replace_text(SUCCESS, "42")))
+
+    results = read_results(path)
+
+    assert list(results["text"]) == ["42", "42"]
+    assert results["text"].str.split().str.len().tolist() == [1, 1]  # still usable as text
+
+
+def replace_text(result, text):
+    return replace(result, text=text)

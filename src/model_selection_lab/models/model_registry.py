@@ -9,6 +9,9 @@ calculate_cost (the cost formula, next to the prices it uses).
 """
 
 from dataclasses import dataclass
+from datetime import date
+
+from model_selection_lab.settings import PRICE_MAX_AGE_DAYS
 
 
 @dataclass(frozen=True)  # frozen: an entry cannot be changed by accident while running
@@ -76,7 +79,8 @@ MODELS = {
         provider="mistral",
         # pinned ID on purpose: mistral-small-latest is an alias we deliberately avoid
         model_id="mistral-small-2603",  # confirmed with a real call on 2026-10-12
-        input_price_per_mtok=0.15,  # order not labelled on the official page: check on the dashboard
+        # order not labelled on the official page: check on the dashboard
+        input_price_per_mtok=0.15,
         output_price_per_mtok=0.60,
         docs_url="https://docs.mistral.ai/models/mistral-small-4-0-26-03",
         date_checked="2026-10-12",
@@ -159,6 +163,25 @@ def select_models(include_premium: bool = False, models: dict = MODELS) -> list[
         for key, model in models.items()
         if model.tier == "standard" or (include_premium and model.tier == "premium")
     ]
+
+
+def stale_prices(
+    model_keys: list[str],
+    models: dict = MODELS,
+    today: date | None = None,
+    max_age_days: int = PRICE_MAX_AGE_DAYS,
+) -> list[str]:
+    """One sentence per model whose prices were last checked more than max_age_days ago."""
+    today = today or date.today()
+    warnings = []
+    for key in model_keys:
+        age = (today - date.fromisoformat(models[key].date_checked)).days
+        if age > max_age_days:
+            warnings.append(
+                f"Prices of {display_name(key, models)} were checked {age} days ago: "
+                "check them against the provider's page before trusting the costs."
+            )
+    return warnings
 
 
 def display_name(model_key: str, models: dict = MODELS) -> str:

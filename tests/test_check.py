@@ -166,3 +166,21 @@ def test_a_check_saves_a_report_and_the_critic_confirms_it(tmp_path):
     assert outcome.report_path.endswith(".md")
     assert "## Per model" in open(outcome.report_path, encoding="utf-8").read()
     assert outcome.critic[0].startswith("Critic: all")
+
+
+def test_a_check_whose_answers_are_all_plain_numbers_still_completes(tmp_path):
+    drafted_with_rule = DRAFTED.replace("inputs:", "checks:\n  max_words: 3\ninputs:", 1)
+
+    def numbers_run(model_key, prompt, max_tokens):
+        result = fake_run(model_key, prompt, max_tokens)
+        result.text = drafted_with_rule if prompt.startswith("Write ") else "42"
+        return result
+
+    outcome = run_check(
+        "Summarise texts.", run=numbers_run, template=TEMPLATE, judge_template="{{ANSWERS}}",
+        tasks_folder=tmp_path / "tasks", results_folder=tmp_path / "results",
+        verdicts_folder=tmp_path / "verdicts",
+    )
+
+    assert (outcome.summary["rules_broken"] == 0).all()
+    assert outcome.critic[0].startswith("Critic: all")

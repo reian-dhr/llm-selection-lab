@@ -1,5 +1,6 @@
 """Tests for model_registry.py: the cost formula and the choice of models to run."""
 
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -9,6 +10,7 @@ from model_selection_lab.models.model_registry import (
     calculate_cost,
     display_name,
     select_models,
+    stale_prices,
 )
 
 FAKE_MODELS = {
@@ -65,3 +67,16 @@ def test_helper_models_are_never_compared():
 def test_display_name_falls_back_to_the_key():
     assert display_name("haiku-5-5") == "Claude Haiku 5.5"
     assert display_name("unknown-model") == "unknown-model"
+
+
+def test_prices_checked_long_ago_are_reported_with_their_age():
+    models = {
+        "old": SimpleNamespace(date_checked="2026-08-01", display_name="Old Model"),
+        "fresh": SimpleNamespace(date_checked="2026-11-01", display_name=""),
+    }
+
+    warnings = stale_prices(["old", "fresh"], models, today=date(2026, 11, 7), max_age_days=45)
+
+    assert len(warnings) == 1
+    assert "Old Model" in warnings[0] and "98 days ago" in warnings[0]
+    assert stale_prices(["fresh"], models, today=date(2026, 11, 7), max_age_days=45) == []

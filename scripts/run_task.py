@@ -25,7 +25,9 @@ from model_selection_lab.settings import MAX_RUN_COST_USD, REUSE_ANSWERS_FOR_DAY
 def read_arguments() -> argparse.Namespace:
     """Read the task file and the options from the command line."""
     parser = argparse.ArgumentParser(description="Run one task on the models in the registry.")
-    parser.add_argument("task_file", help="a task YAML file, for example examples/tasks/example_summary.yaml")
+    parser.add_argument(
+        "task_file", help="a task YAML file, for example examples/tasks/example_summary.yaml"
+    )
     parser.add_argument(
         "--premium", action="store_true", help="also run the premium (expensive) models"
     )

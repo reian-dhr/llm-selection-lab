@@ -1,7 +1,8 @@
 """Estimate what one real, larger job would cost on each model.
 
 Run with:
-  uv run python scripts/estimate_job_cost.py results/<file>.jsonl --context-pages 30 --answer-pages 2 --turns 5
+  uv run python scripts/estimate_job_cost.py results/<file>.jsonl \
+    --context-pages 30 --answer-pages 2 --turns 5
 
 Makes no API calls. It uses the results file to measure how each model counts tokens,
 then prices a job of the size you describe. Figures are at list prices and are estimates:
@@ -10,9 +11,8 @@ the times_cheapest column is the most reliable one.
 
 import argparse
 
-import pandas as pd
-
 from model_selection_lab.report.job_cost import estimate_job_cost, measure_token_rates
+from model_selection_lab.runs.results_storage import read_results
 from model_selection_lab.runs.task_loader import find_task_file, load_task
 
 
@@ -32,7 +32,7 @@ def read_arguments() -> argparse.Namespace:
 
 if __name__ == "__main__":
     arguments = read_arguments()
-    results = pd.read_json(arguments.results_file, lines=True)
+    results = read_results(arguments.results_file)
     task = load_task(find_task_file(results["task_name"].iloc[0]))
 
     token_rates = measure_token_rates(results, task)

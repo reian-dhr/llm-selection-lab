@@ -1,8 +1,8 @@
 """Tests for judge/picks.py: saving and reloading the expert's picks."""
 
-import pytest
-
 import json
+
+import pytest
 
 from model_selection_lab.judge.picks import (
     answers_by_input,

@@ -97,7 +97,9 @@ def draft_task(
             return data, task, cost
         except ValueError as problem:
             if attempt == 2:
-                raise ValueError(f"The helper model did not write a valid task: {problem}")
+                raise ValueError(
+                    f"The helper model did not write a valid task: {problem}"
+                ) from problem
             # Ask once more, saying exactly what was wrong.
             prompt += (
                 f"\n\nYour previous answer could not be used: {problem}\n"

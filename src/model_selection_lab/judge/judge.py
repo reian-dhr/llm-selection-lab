@@ -2,8 +2,8 @@
 
 For one test input, the judge sees the task, your rules, a few of your most recent picks
 (with your reasons) as examples, and every model's answer labelled A, B, C... in a
-shuffled order, without model names. It writes a short critique per answer, then picks one and lists any
-it would refuse. It is a helper model from a family outside the comparison.
+shuffled order, without model names. It writes a short critique per answer, then picks one
+and lists any it would refuse. It is a helper model from a family outside the comparison.
 
 The judge does not train. It improves because every new pick you make becomes an example
 for the next judgement. agreement() measures how often it matched your picks. In the web
@@ -186,7 +186,9 @@ def judge_input(
     texts = [answers[model]["text"] for model in order]
     checks = merge_checks(task.checks, task_input.checks)
     broken = [run_code_checks(text, checks) for text in texts]
-    prompt = build_judge_prompt(template, task_text, task_input.input, texts, rules, examples, broken)
+    prompt = build_judge_prompt(
+        template, task_text, task_input.input, texts, rules, examples, broken
+    )
     result = run(JUDGE_MODEL, prompt, max_tokens=JUDGE_MAX_TOKENS)
     if result.error is not None:
         raise RuntimeError(f"The judge could not answer: {result.error}")

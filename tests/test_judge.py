@@ -8,15 +8,15 @@ import pytest
 
 from model_selection_lab.judge.judge import (
     agreement,
-    swap_test,
-    wilson_interval,
     build_judge_prompt,
     judge_check,
     load_rules,
     load_verdicts,
     parse_verdict,
     recent_examples,
+    swap_test,
     verdicts_path_for,
+    wilson_interval,
 )
 from model_selection_lab.judge.picks import make_pick, save_pick, shown_order
 from model_selection_lab.models.call_result import RunResult
@@ -103,7 +103,8 @@ def test_judge_check_saves_a_verdict_per_input_and_skips_judged_ones(tmp_path):
     assert judge_check(outcome, run=fake_run, verdicts_folder=folder, template=TEMPLATE) == 1
     assert judge_check(outcome, run=fake_run, verdicts_folder=folder, template=TEMPLATE) == 0
     assert len(calls) == 1
-    verdict = load_verdicts(verdicts_path_for("check_1_run", folder))["easy_01"]  # named after the run
+    # verdicts are named after the run
+    verdict = load_verdicts(verdicts_path_for("check_1_run", folder))["easy_01"]
     assert verdict.chosen_model == order[0]  # "A" is the first model of the shown order
 
 
@@ -199,7 +200,9 @@ def judged_outcome(tmp_path, judge):
 def test_a_judge_that_follows_the_content_gives_the_same_pick_when_answers_are_reversed(tmp_path):
     outcome = judged_outcome(tmp_path, content_judge)
 
-    result = swap_test(outcome, run=content_judge, verdicts_folder=tmp_path / "v", template=TEMPLATE)
+    result = swap_test(
+        outcome, run=content_judge, verdicts_folder=tmp_path / "v", template=TEMPLATE
+    )
 
     assert result == {"tested": 1, "consistent": 1, "always_first": 0}
 

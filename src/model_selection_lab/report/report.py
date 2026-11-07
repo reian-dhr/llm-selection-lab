@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from model_selection_lab.report.summary import with_rule_failures
+from model_selection_lab.runs.results_storage import read_results
 
 # (measure, column title) in the order of the table. judge_wins only exists if the judge ran.
 COLUMNS = [
@@ -77,7 +78,7 @@ def build_report(outcome) -> tuple[str, list[Claim]]:
             cells.append(claim.shown)
         rows.append("| " + " | ".join([model] + cells) + " |")
 
-    results = with_rule_failures(pd.read_json(outcome.results_path, lines=True), outcome.task)
+    results = with_rule_failures(read_results(outcome.results_path), outcome.task)
     header = "| model | " + " | ".join(title for _, title in columns) + " |"
     divider = "|" + "---|" * (len(columns) + 1)
     lines = [

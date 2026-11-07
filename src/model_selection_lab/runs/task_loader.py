@@ -42,9 +42,9 @@ INPUT_FIELDS = ("id", "input")
 
 def check_fields(data: dict, fields: tuple, label: str) -> None:
     """Raise a clear error if one of the expected fields is not in data."""
-    for field in fields:
-        if field not in data:
-            raise ValueError(f"{label} is missing the field '{field}'")
+    for name in fields:
+        if name not in data:
+            raise ValueError(f"{label} is missing the field '{name}'")
 
 
 TASK_FOLDERS = ("tasks", "tasks/generated")

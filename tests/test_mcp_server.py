@@ -2,8 +2,9 @@
 
 from functools import partial
 
-from model_selection_lab import check, mcp_server
 from test_check import TEMPLATE, fake_run
+
+from model_selection_lab import check, mcp_server
 
 
 def use_fakes(monkeypatch, tmp_path):
@@ -67,3 +68,12 @@ def test_run_refuses_a_file_outside_the_task_folders(monkeypatch, tmp_path):
 
     assert text.startswith("Refused")
     assert dotted.startswith("Refused")
+
+
+def test_preview_warns_when_prices_may_be_out_of_date(monkeypatch, tmp_path):
+    use_fakes(monkeypatch, tmp_path)
+    monkeypatch.setattr(mcp_server, "stale_prices", lambda keys: ["Prices of X are old."])
+
+    text = mcp_server.preview_check("Summarise texts.")
+
+    assert "Prices of X are old." in text

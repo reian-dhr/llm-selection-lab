@@ -62,7 +62,8 @@ def test_find_task_file_looks_in_each_folder(tmp_path):
 
 def test_reference_difficulty_and_checks_are_optional(tmp_path):
     task = parse_task(
-        {"name": "t", "description": "d", "instruction": "i", "inputs": [{"id": "a", "input": "x"}]},
+        {"name": "t", "description": "d", "instruction": "i",
+         "inputs": [{"id": "a", "input": "x"}]},
         "test",
     )
 

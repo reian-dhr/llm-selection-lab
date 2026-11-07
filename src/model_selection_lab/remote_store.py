@@ -100,6 +100,8 @@ def pull_picks(token: str, repo: str, branch: str = DATA_BRANCH, http=github_req
     if status != 200:
         return 0
     pulled = 0
+    # shortcut: two GitHub calls per picks file at every start. Fine below about 200 picks
+    # files; beyond that, download the whole branch as one archive instead.
     for item in listing:
         if item.get("type") != "file" or not item["name"].endswith(".jsonl"):
             continue

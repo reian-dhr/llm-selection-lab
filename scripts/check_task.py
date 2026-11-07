@@ -16,6 +16,7 @@ import argparse
 from pathlib import Path
 
 from model_selection_lab.check import finish_check, prepare_check
+from model_selection_lab.models.model_registry import stale_prices
 from model_selection_lab.report.summary import format_report
 from model_selection_lab.runs.task_drafter import describe_understanding
 from model_selection_lab.settings import MAX_RUN_COST_USD
@@ -49,6 +50,8 @@ if __name__ == "__main__":
         f"This run costs at most about ${outcome.max_cost_usd:.2f} "
         f"(cap ${arguments.max_cost:.2f})."
     )
+    for warning in stale_prices(outcome.model_keys):
+        print(warning)
 
     if arguments.preview:
         print("\nPreview only: no model was called. To run this exact test:")

@@ -26,6 +26,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.17.4",
 ]
 
 [tool.uv]
@@ -35,3 +36,11 @@ constraint-dependencies = ["cryptography<49"]
 [tool.pytest.ini_options]
 # The web app folder is not a package; this lets tests import its helpers (components.py).
 pythonpath = ["app"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# B905 (zip strict=) is off: some zips are deliberately unequal (8 letters, fewer answers).
+select = ["E", "F", "I", "B"]
+ignore = ["B905"]

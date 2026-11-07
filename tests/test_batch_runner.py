@@ -2,22 +2,21 @@
 
 import json
 import threading
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
 
-from dataclasses import replace
-
 from model_selection_lab.models.call_result import RunResult
 from model_selection_lab.models.model_registry import ModelInfo
 from model_selection_lab.runs.batch_runner import build_prompt, estimate_max_cost, run_task
+from model_selection_lab.runs.results_storage import load_reusable_answers
+from model_selection_lab.runs.task_loader import Task, TaskInput
 from model_selection_lab.settings import (
     MAX_ANSWER_TOKENS,
     THINKING_EXTRA_TOKENS,
     TOKENS_PER_WORD_ESTIMATE,
 )
-from model_selection_lab.runs.results_storage import load_reusable_answers
-from model_selection_lab.runs.task_loader import Task, TaskInput
 
 TASK = Task(
     name="tiny_task",
@@ -106,10 +105,12 @@ def test_run_task_stops_when_spending_reaches_the_cap(tmp_path, capsys):
 def test_estimate_max_cost_assumes_full_length_answers():
     models = {
         "plain": SimpleNamespace(
-            model_id="plain-id", reasoning=False, input_price_per_mtok=1.0, output_price_per_mtok=10.0
+            model_id="plain-id", reasoning=False,
+            input_price_per_mtok=1.0, output_price_per_mtok=10.0,
         ),
         "thinker": SimpleNamespace(
-            model_id="thinker-id", reasoning=True, input_price_per_mtok=1.0, output_price_per_mtok=10.0
+            model_id="thinker-id", reasoning=True,
+            input_price_per_mtok=1.0, output_price_per_mtok=10.0,
         ),
     }
     input_tokens = sum(

@@ -26,7 +26,7 @@ from model_selection_lab.report.critic import critic_lines, verify_report
 from model_selection_lab.report.report import build_report
 from model_selection_lab.report.summary import recommend, summarise, with_rule_failures
 from model_selection_lab.runs.batch_runner import estimate_max_cost, run_task
-from model_selection_lab.runs.results_storage import load_reusable_answers
+from model_selection_lab.runs.results_storage import load_reusable_answers, read_results
 from model_selection_lab.runs.task_drafter import GENERATED_FOLDER, draft_task, save_drafted_task
 from model_selection_lab.runs.task_loader import Task, load_task
 from model_selection_lab.settings import MAX_RUN_COST_USD, REUSE_ANSWERS_FOR_DAYS
@@ -138,7 +138,7 @@ def summarise_in_order(results_path: str, model_keys: list[str], task: Task) -> 
     """The summary of a results file, one row per model, in the order of model_keys, with the
     task's code checks applied. Answers are saved as they arrive, so the file itself is in no
     useful order."""
-    results = with_rule_failures(pd.read_json(results_path, lines=True), task)
+    results = with_rule_failures(read_results(results_path), task)
     summary = summarise(results)
     return summary.loc[[key for key in model_keys if key in summary.index]]
 
@@ -209,7 +209,7 @@ def load_check(
     if results_path is None:
         model_keys = select_models()
     else:
-        used = set(pd.read_json(results_path, lines=True)["model_key"])
+        used = set(read_results(results_path)["model_key"])
         registry_order = list(MODELS)  # models no longer in the registry go last
         model_keys = sorted(
             used, key=lambda key: registry_order.index(key) if key in registry_order else 99

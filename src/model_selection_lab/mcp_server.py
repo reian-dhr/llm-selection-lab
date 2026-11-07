@@ -21,6 +21,7 @@ from pathlib import Path
 from mcp.server import MCPServer
 
 from model_selection_lab import check
+from model_selection_lab.models.model_registry import stale_prices
 from model_selection_lab.report.summary import format_report
 from model_selection_lab.runs.task_drafter import describe_understanding
 from model_selection_lab.runs.task_loader import TASK_FOLDERS
@@ -45,6 +46,7 @@ def describe_preview(outcome) -> str:
         f"Test saved to: {outcome.task_path} ({len(outcome.task.inputs)} inputs)",
         f"Models: {', '.join(outcome.model_keys)}",
         f"Maximum cost: about ${outcome.max_cost_usd:.2f} (cap ${MAX_RUN_COST_USD:.2f})",
+        *stale_prices(outcome.model_keys),
         "Nothing was spent. Show this to the user and ask before calling run_check.",
     ]
     return "\n".join(lines)
@@ -74,7 +76,8 @@ def preview_check(description: str) -> str:
 @server.tool()
 def run_check(task_path: str) -> str:
     """Run a previewed test on the standard models and return cost, speed, quality (a judge
-    rates the answers) and a recommendation. Costs money: only call it after the user agreed to the preview."""
+    rates the answers) and a recommendation. Costs money: only call it after the user agreed
+    to the preview."""
     if not is_task_file(task_path):
         return f"Refused: {task_path} is not a test file in {' or '.join(TASK_FOLDERS)}."
     outcome = check.load_check(task_path)

@@ -13,8 +13,8 @@ it starts, run_task() stops when actual spending reaches a cap, and an answer al
 saved for the same prompt and model is reused instead of being paid for again.
 """
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from model_selection_lab.models.call_result import RunResult
 from model_selection_lab.models.model_client import run_model

@@ -17,7 +17,7 @@ def with_rule_failures(results: pd.DataFrame, task: Task) -> pd.DataFrame:
     (see judge/code_checks.py), empty if nothing. Calls that failed have no answer to check."""
     checks = {item.id: merge_checks(task.checks, item.checks) for item in task.inputs}
     failures = [
-        "" if error is not None and error == error  # error is a text, not empty or NaN
+        "" if isinstance(error, str)  # a failed call has no answer to check
         else "; ".join(run_code_checks(text, checks.get(input_id, task.checks)))
         for text, input_id, error in zip(results["text"], results["input_id"], results["error"])
     ]

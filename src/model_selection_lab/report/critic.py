@@ -38,7 +38,10 @@ def recompute(model_rows: list[dict], metric: str, task, wins: Counter, model: s
     if metric == "cut_off":
         return sum(1 for row in model_rows if row.get("truncated") is True)
     if metric == "rules_broken":
-        return sum(1 for row in good if run_code_checks(row["text"], checks.get(row["input_id"], task.checks)))
+        return sum(
+            1 for row in good
+            if run_code_checks(row["text"], checks.get(row["input_id"], task.checks))
+        )
     if metric == "judge_wins":
         return wins[model]
     if not good:

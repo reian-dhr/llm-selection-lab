@@ -72,6 +72,10 @@ REUSE_ANSWERS_FOR_DAYS = 30
 # high side (the highest rate measured on the test tasks was about 2.2).
 TOKENS_PER_WORD_ESTIMATE = 2.3
 
+# Prices in the registry older than this many days are reported as possibly out of date
+# before a check runs (providers change prices every few months).
+PRICE_MAX_AGE_DAYS = 45
+
 # --- Estimating the cost of a real job ---
 
 # How many words one page is assumed to hold.
