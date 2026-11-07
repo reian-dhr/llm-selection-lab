@@ -60,3 +60,5 @@ if __name__ == "__main__":
         print(format_report(
             outcome.summary, outcome.recommendation, outcome.results_path, outcome.judge_error
         ))
+        print(f"\nReport saved to {outcome.report_path}")
+        print("\n".join(outcome.critic))

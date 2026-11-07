@@ -59,7 +59,9 @@ src/model_selection_lab/
     judge.py             the judge: prompt, verdicts, agreement with the picks
     code_checks.py       rules a machine verifies first: word limit, must include, valid JSON
   report/
-    summary.py           one row per model; recommendation on cost and speed
+    summary.py           one row per model; recommendation on cost, speed and quality
+    report.py            the Markdown report of a check, built from claims (model, measure, value)
+    critic.py            recomputes every claim from the raw results and flags any mismatch
     job_cost.py          estimated cost of one larger, real job per model
 scripts/
   check_task.py          a whole check from the terminal
@@ -88,6 +90,13 @@ retried once, with the problem explained. It answers in JSON, which quotes every
 (`rules_broken`) and the model is left out of the recommendation, whatever a judge would
 say: a missing number is a fact, not an opinion. A misspelt rule is an error when the task
 is loaded, so a typo cannot silently disable a check.
+
+**A critic that does not trust the report.** Every number in a check's report is a claim.
+The critic goes back to the saved results file, recounts and averages in plain Python,
+and compares with what the report says; it also checks the report text really contains the
+value, so a bug in the summary and a hand edit are both caught. It is code, not a second
+model, so it cannot be talked into agreeing. It does not check the recommendation sentences,
+which are built from the same table.
 
 **Measuring the judge.** `scripts/judge_reliability.py` reports how often the judge chose
 the answer you chose, next to what a random judge would match and the range the true rate

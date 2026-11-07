@@ -59,6 +59,13 @@ saved in `results/` to read.
   request takes about as long as the slowest model. Each call's cost is counted under a lock
   before the next one starts, and every saved answer records the model ID and prices it was
   billed with, so any cost can be checked later.
+- **The report is checked by code, not by another model.** Each number in a check's report
+  is a claim that a critic recomputes from the raw results file; a wrong or edited number is
+  flagged.
+- **Rules before opinions.** A task can list machine-checkable rules (word limit, required
+  facts, valid JSON). An answer that breaks one is counted and the model is left out of the
+  recommendation, whatever the judge thinks. The judge is also measured: agreement with the
+  user's picks next to the chance level, and a position-swap test for order bias.
 - **Errors are data.** Every call returns a result with an error field instead of raising;
   temporary errors are retried following the provider's `retry-after`, permanent ones are
   not, and cut-off answers are flagged. A busy judge still leaves the user with the answers.

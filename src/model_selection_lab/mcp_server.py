@@ -55,7 +55,11 @@ def describe_run(outcome) -> str:
     report = format_report(
         outcome.summary, outcome.recommendation, outcome.results_path, outcome.judge_error
     )
-    return f"Results saved to: {outcome.results_path}\n\n{report}"
+    critic = "\n".join(outcome.critic)
+    return (
+        f"Results saved to: {outcome.results_path}\nReport saved to: {outcome.report_path}\n\n"
+        f"{report}\n\n{critic}"
+    )
 
 
 @server.tool()

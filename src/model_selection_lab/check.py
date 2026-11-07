@@ -6,7 +6,8 @@
 Every step already exists elsewhere; this file only puts them in order. It has two parts,
 so the user sees the drafted test and its cost before any compared model is called:
 - prepare_check(): draft the test and estimate the cost (only the free helper is called),
-- finish_check(): run the test on the models, ask the judge, then summarise and recommend.
+- finish_check(): run the test on the models, ask the judge, summarise, recommend, then
+  write the report and let the critic check it.
 run_check() does both in one call. list_checks() and load_check() bring past checks back.
 """
 
@@ -21,6 +22,8 @@ import yaml
 from model_selection_lab.judge.judge import judge_check, load_verdicts, verdicts_path_for
 from model_selection_lab.models.model_client import run_model
 from model_selection_lab.models.model_registry import MODELS, select_models
+from model_selection_lab.report.critic import critic_lines, verify_report
+from model_selection_lab.report.report import build_report
 from model_selection_lab.report.summary import recommend, summarise, with_rule_failures
 from model_selection_lab.runs.batch_runner import estimate_max_cost, run_task
 from model_selection_lab.runs.results_storage import load_reusable_answers
@@ -43,6 +46,8 @@ class CheckOutcome:
     summary: pd.DataFrame | None = None  # one row per model
     recommendation: list[str] | None = None  # short sentences
     judge_error: str = ""  # why the judge could not rate the answers; empty if it did
+    report_path: str = ""  # the Markdown report saved next to the results
+    critic: list[str] | None = None  # the critic's verdict on the report, short sentences
 
 
 def prepare_check(
@@ -102,7 +107,20 @@ def finish_check(
     except Exception as problem:  # busy, key missing...: the check is still worth reporting
         outcome.judge_error = str(problem)
     add_summary(outcome, verdicts_folder)
+    write_report(outcome, verdicts_folder)
     return outcome
+
+
+def write_report(outcome: CheckOutcome, verdicts_folder: str) -> None:
+    """Save the report next to the results, and let the critic check every number in it
+    against the raw results."""
+    markdown, claims = build_report(outcome)
+    outcome.report_path = str(Path(outcome.results_path).with_suffix(".md"))
+    Path(outcome.report_path).write_text(markdown, encoding="utf-8")
+    findings = verify_report(
+        markdown, claims, outcome.results_path, outcome.task, verdicts_folder
+    )
+    outcome.critic = critic_lines(findings)
 
 
 def add_summary(outcome: CheckOutcome, verdicts_folder: str = "data/verdicts") -> None:

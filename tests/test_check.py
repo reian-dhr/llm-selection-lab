@@ -154,3 +154,15 @@ def test_a_busy_judge_leaves_the_check_without_quality_but_does_not_fail_it(tmp_
     assert "busy" in outcome.judge_error
     assert "judge_wins" not in outcome.summary.columns
     assert any(line.startswith("Cheapest:") for line in outcome.recommendation)
+
+
+def test_a_check_saves_a_report_and_the_critic_confirms_it(tmp_path):
+    outcome = run_check(
+        "Summarise texts.", run=judge_aware_run, template=TEMPLATE, judge_template="{{ANSWERS}}",
+        tasks_folder=tmp_path / "tasks", results_folder=tmp_path / "results",
+        verdicts_folder=tmp_path / "verdicts",
+    )
+
+    assert outcome.report_path.endswith(".md")
+    assert "## Per model" in open(outcome.report_path, encoding="utf-8").read()
+    assert outcome.critic[0].startswith("Critic: all")
