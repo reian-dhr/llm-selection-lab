@@ -18,7 +18,7 @@ import pandas as pd
 import yaml
 
 from model_selection_lab.models.model_client import run_model
-from model_selection_lab.models.model_registry import select_models
+from model_selection_lab.models.model_registry import MODELS, select_models
 from model_selection_lab.report.summary import recommend, summarise
 from model_selection_lab.runs.batch_runner import estimate_max_cost, run_task
 from model_selection_lab.runs.results_storage import load_reusable_answers
@@ -84,9 +84,16 @@ def finish_check(
         task, model_keys, outcome.results_path, run=run,
         max_cost_usd=max_cost_usd, reusable=reusable,
     )
-    outcome.summary = summarise(pd.read_json(outcome.results_path, lines=True))
+    outcome.summary = summarise_in_order(outcome.results_path, model_keys)
     outcome.recommendation = recommend(outcome.summary)
     return outcome
+
+
+def summarise_in_order(results_path: str, model_keys: list[str]) -> pd.DataFrame:
+    """The summary of a results file, one row per model, in the order of model_keys.
+    Answers are saved as they arrive, so the file itself is in no useful order."""
+    summary = summarise(pd.read_json(results_path, lines=True))
+    return summary.loc[[key for key in model_keys if key in summary.index]]
 
 
 def run_check(
@@ -148,7 +155,11 @@ def load_check(task_path: str, results_folder: str = "results") -> CheckOutcome:
     if results_path is None:
         model_keys = select_models()
     else:
-        model_keys = list(dict.fromkeys(pd.read_json(results_path, lines=True)["model_key"]))
+        used = set(pd.read_json(results_path, lines=True)["model_key"])
+        registry_order = list(MODELS)  # models no longer in the registry go last
+        model_keys = sorted(
+            used, key=lambda key: registry_order.index(key) if key in registry_order else 99
+        )
     reusable = load_reusable_answers(results_folder, task.name, REUSE_ANSWERS_FOR_DAYS)
     outcome = CheckOutcome(
         drafted=drafted,
@@ -160,7 +171,7 @@ def load_check(task_path: str, results_folder: str = "results") -> CheckOutcome:
     )
     if results_path is not None:
         outcome.results_path = results_path
-        outcome.summary = summarise(pd.read_json(results_path, lines=True))
+        outcome.summary = summarise_in_order(results_path, model_keys)
         outcome.recommendation = recommend(outcome.summary)
     return outcome
 

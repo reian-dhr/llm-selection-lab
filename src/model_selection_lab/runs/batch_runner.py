@@ -13,6 +13,9 @@ it starts, run_task() stops when actual spending reaches a cap, and an answer al
 saved for the same prompt and model is reused instead of being paid for again.
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+
 from model_selection_lab.models.call_result import RunResult
 from model_selection_lab.models.model_client import run_model
 from model_selection_lab.models.model_registry import MODELS, calculate_cost
@@ -20,6 +23,7 @@ from model_selection_lab.runs.results_storage import append_result, fingerprint_
 from model_selection_lab.runs.task_loader import Task
 from model_selection_lab.settings import (
     MAX_ANSWER_TOKENS,
+    MAX_PARALLEL_CALLS,
     MAX_RUN_COST_USD,
     THINKING_EXTRA_TOKENS,
     TOKENS_PER_WORD_ESTIMATE,
@@ -90,12 +94,15 @@ def run_task(
     max_cost_usd: float = MAX_RUN_COST_USD,
     reusable: dict | None = None,
     models: dict = MODELS,
+    parallel_calls: int = MAX_PARALLEL_CALLS,
 ) -> None:
     """Run every input of the task on every model and append each result to output_path.
 
+    Calls run at the same time (up to parallel_calls), and each answer is saved as soon as
+    it arrives, so lines are in the order of arrival, not of the task.
     run: the function that makes one call. Tests pass a fake one so they need no network.
-    max_cost_usd: the spending cap. The run stops before the next call once spending
-        has reached it. Answers already saved are kept.
+    max_cost_usd: the spending cap. Once spending has reached it, calls that have not
+        started are dropped; those already running finish and are kept.
     models: the registry, used to tell whether a saved answer came from the same model and
         settings. Tests pass a small fake one.
     reusable: saved answers from load_reusable_answers(). When one matches the input,
@@ -108,26 +115,51 @@ def run_task(
     failed = 0
     reused = 0
     spent = 0.0
+    to_call = []  # (input id, model key, prompt, fingerprint) for every answer not saved yet
     for task_input in task.inputs:
         prompt = build_prompt(task.instruction, task_input.input)
         for model_key in model_keys:
             prompt_hash = fingerprint_call(prompt, model_key, models)
             saved = reusable.get((task_input.id, model_key, prompt_hash))
-            if saved is not None:
-                append_result(output_path, saved)
-                done += 1
-                reused += 1
-                print(f"[{done}/{total}] {task_input.id} on {model_key}: reused saved answer, $0")
+            if saved is None:
+                to_call.append((task_input.id, model_key, prompt, prompt_hash))
                 continue
-            if spent >= max_cost_usd:
-                print(
-                    f"STOPPED: spending reached the cap of ${max_cost_usd:.2f} "
-                    f"after {done} of {total} calls. Results so far saved to {output_path}"
-                )
-                return
-            result = run_one(run, model_key, prompt)
+            append_result(output_path, saved)
+            done += 1
+            reused += 1
+            print(f"[{done}/{total}] {task_input.id} on {model_key}: reused saved answer, $0")
+
+    cap_reached = threading.Event()
+    counting = threading.Lock()
+
+    def attempt(model_key: str, prompt: str):
+        """One call, unless the cap was reached before it started (then None).
+        Its cost is counted here, before the next call can start, so the cap is exact."""
+        nonlocal spent
+        if cap_reached.is_set():
+            return None
+        result = run_one(run, model_key, prompt)
+        with counting:
             spent += result.cost_usd
-            record = make_record(task.name, task_input.id, model_key, result, prompt_hash)
+            if spent >= max_cost_usd:
+                cap_reached.set()
+        return result
+
+    dropped = 0
+    with ThreadPoolExecutor(max_workers=parallel_calls) as pool:
+        waiting = {
+            pool.submit(attempt, model_key, prompt): (input_id, model_key, prompt_hash)
+            for input_id, model_key, prompt, prompt_hash in to_call
+        }
+        for future in as_completed(waiting):
+            input_id, model_key, prompt_hash = waiting[future]
+            result = future.result()
+            if result is None:
+                dropped += 1
+                continue
+            record = make_record(
+                task.name, input_id, model_key, result, prompt_hash, models.get(model_key)
+            )
             append_result(output_path, record)
 
             done += 1
@@ -138,8 +170,14 @@ def run_task(
             else:
                 failed += 1
                 status = f"FAILED, {result.error}"
-            print(f"[{done}/{total}] {task_input.id} on {model_key}: {status}")
+            print(f"[{done}/{total}] {input_id} on {model_key}: {status}")
 
+    if dropped:
+        print(
+            f"STOPPED: spending reached the cap of ${max_cost_usd:.2f} "
+            f"after {done} of {total} calls. Results so far saved to {output_path}"
+        )
+        return
     print(
         f"Done: {total} answers ({reused} reused, {failed} failed), ${spent:.4f} spent. "
         f"Results saved to {output_path}"

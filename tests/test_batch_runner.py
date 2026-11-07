@@ -1,6 +1,7 @@
 """Tests for batch_runner.py: the batch loop. A fake run_model is used, so no network."""
 
 import json
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -65,15 +66,16 @@ def test_run_task_saves_one_line_per_input_and_model(tmp_path):
     run_task(TASK, ["model-a", "model-b"], path, run=fake_run)
 
     lines = read_lines(path)
-    pairs = [(line["input_id"], line["model_key"]) for line in lines]
-    assert pairs == [
+    pairs = {(line["input_id"], line["model_key"]) for line in lines}
+    assert len(lines) == 4  # answers arrive in any order when calls run together
+    assert pairs == {
         ("easy_01", "model-a"),
         ("easy_01", "model-b"),
         ("hard_01", "model-a"),
         ("hard_01", "model-b"),
-    ]
-    assert lines[0]["task_name"] == "tiny_task"
-    assert lines[0]["text"] == "answer from model-a"
+    }
+    assert {line["task_name"] for line in lines} == {"tiny_task"}
+    assert {line["text"] for line in lines} == {"answer from model-a", "answer from model-b"}
 
 
 def test_run_task_continues_after_a_failed_call(tmp_path):
@@ -83,17 +85,19 @@ def test_run_task_continues_after_a_failed_call(tmp_path):
 
     lines = read_lines(path)
     assert len(lines) == 4  # the 2 failed calls are saved too, and the run went on
-    assert lines[0]["model_key"] == "broken"
-    assert "KeyError" in lines[0]["error"]
-    assert lines[1]["model_key"] == "model-a"
-    assert lines[1]["error"] is None
+    broken = [line for line in lines if line["model_key"] == "broken"]
+    good = [line for line in lines if line["model_key"] == "model-a"]
+    assert len(broken) == 2 and all("KeyError" in line["error"] for line in broken)
+    assert len(good) == 2 and all(line["error"] is None for line in good)
 
 
 def test_run_task_stops_when_spending_reaches_the_cap(tmp_path, capsys):
     path = tmp_path / "run.jsonl"
 
     # Each fake call costs $0.001, so a cap of $0.002 allows exactly 2 of the 4 calls.
-    run_task(TASK, ["model-a", "model-b"], path, run=fake_run, max_cost_usd=0.002)
+    run_task(
+        TASK, ["model-a", "model-b"], path, run=fake_run, max_cost_usd=0.002, parallel_calls=1
+    )
 
     assert len(read_lines(path)) == 2
     assert "STOPPED" in capsys.readouterr().out
@@ -209,3 +213,42 @@ def test_saved_answers_are_not_reused_when_the_model_behind_a_key_changed(tmp_pa
 
     assert len(calls) == 2  # both inputs asked again, nothing reused
     assert estimate_max_cost(TASK, ["m"], {"m": new}, reusable=reusable) > 0
+
+
+def test_run_task_saves_the_model_id_and_prices_with_each_answer(tmp_path):
+    model = ModelInfo(
+        provider="anthropic", model_id="model-v1", input_price_per_mtok=0.5,
+        output_price_per_mtok=2.0, docs_url="", date_checked="", reasoning=False,
+    )
+    path = tmp_path / "run.jsonl"
+
+    run_task(TASK, ["m"], path, run=fake_run, models={"m": model})
+
+    line = read_lines(path)[0]
+    assert line["model_id"] == "model-v1"
+    assert (line["input_price_per_mtok"], line["output_price_per_mtok"]) == (0.5, 2.0)
+
+
+def test_calls_run_at_the_same_time(tmp_path):
+    # Each call waits for another one to arrive. That only works if two run together.
+    meeting = threading.Barrier(2, timeout=5)
+
+    def waiting_run(model_key, prompt, max_tokens):
+        meeting.wait()
+        return fake_run(model_key, prompt, max_tokens)
+
+    path = tmp_path / "run.jsonl"
+
+    run_task(TASK, ["model-a"], path, run=waiting_run, parallel_calls=2)  # 2 inputs, 1 model
+
+    assert [line["error"] for line in read_lines(path)] == [None, None]
+
+
+def test_a_cap_reached_early_stops_calls_that_have_not_started(tmp_path, capsys):
+    # One worker, so each call starts after the previous one finished and was counted.
+    path = tmp_path / "run.jsonl"
+
+    run_task(TASK, ["model-a", "model-b"], path, run=fake_run, max_cost_usd=0.001, parallel_calls=1)
+
+    assert len(read_lines(path)) == 1
+    assert "STOPPED" in capsys.readouterr().out

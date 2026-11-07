@@ -54,6 +54,10 @@ speed, and saves every answer in `results/` to read.
   refused or stopped at a cap; premium models are opt-in only. The MCP server splits
   `preview_check` and `run_check` into two tools, so an agent cannot spend money before the
   user has seen the cost.
+- **Models answer at the same time, and the cap stays exact.** Calls run in parallel, so a
+  request takes about as long as the slowest model. Each call's cost is counted under a lock
+  before the next one starts, and every saved answer records the model ID and prices it was
+  billed with, so any cost can be checked later.
 - **Errors are data.** Every call returns a result with an error field instead of raising;
   temporary errors are retried following the provider's `retry-after`, permanent ones are
   not, and cut-off answers are flagged. A busy judge still leaves the user with the answers.

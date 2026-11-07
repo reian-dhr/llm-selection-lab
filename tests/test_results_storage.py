@@ -74,3 +74,37 @@ def test_fingerprint_changes_when_the_model_or_its_settings_change(monkeypatch):
 def test_fingerprint_of_a_model_not_in_the_registry_still_depends_on_prompt_and_key():
     assert fingerprint_call("Say hi.", "unknown", {}) != fingerprint_call("Say bye.", "unknown", {})
     assert fingerprint_call("Say hi.", "unknown", {}) != fingerprint_call("Say hi.", "other", {})
+
+
+PLAIN_MODEL = ModelInfo(
+    provider="anthropic", model_id="model-v1", input_price_per_mtok=0.5,
+    output_price_per_mtok=2.0, docs_url="", date_checked="", reasoning=False,
+)
+
+
+def test_make_record_stores_the_model_id_and_the_prices_used():
+    record = make_record("t", "easy_01", "m", SUCCESS, "hash", PLAIN_MODEL)
+
+    assert record.model_id == "model-v1"
+    assert (record.input_price_per_mtok, record.output_price_per_mtok) == (0.5, 2.0)
+
+
+def test_make_record_without_a_registry_model_leaves_those_fields_empty():
+    record = make_record("t", "easy_01", "m", SUCCESS)
+
+    assert record.model_id == ""
+    assert (record.input_price_per_mtok, record.output_price_per_mtok) == (0.0, 0.0)
+
+
+def test_lines_saved_before_these_fields_existed_still_load(tmp_path):
+    old_line = {
+        "task_name": "t", "input_id": "easy_01", "model_key": "m",
+        "timestamp": "2099-01-01T00:00:00+00:00", "text": "hi", "input_tokens": 1,
+        "output_tokens": 1, "latency_s": 0.1, "cost_usd": 0.0, "error": None,
+        "truncated": False, "prompt_hash": "abc",
+    }
+    (tmp_path / "t_1.jsonl").write_text(json.dumps(old_line) + "\n")
+
+    reusable = results_storage.load_reusable_answers(tmp_path, "t", max_age_days=30)
+
+    assert reusable[("easy_01", "m", "abc")].model_id == ""

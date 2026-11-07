@@ -24,6 +24,11 @@ THINKING_EXTRA_TOKENS = 4000
 # Models that think can need over a minute, so this is generous.
 REQUEST_TIMEOUT_S = 120
 
+# How many calls to different models run at the same time. A request then takes about as
+# long as its slowest model, not the sum of all. Calls already running when the spending cap
+# is reached still finish, so a run can go over the cap by the cost of those calls.
+MAX_PARALLEL_CALLS = 6
+
 # How many times one call is tried before giving up: 1 first try + 2 retries.
 MAX_TRIES = 3
 

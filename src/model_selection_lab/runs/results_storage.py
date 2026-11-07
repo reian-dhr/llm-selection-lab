@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from model_selection_lab.models.call_result import RunResult
-from model_selection_lab.models.model_registry import MODELS
+from model_selection_lab.models.model_registry import MODELS, ModelInfo
 from model_selection_lab.settings import MAX_ANSWER_TOKENS, THINKING_EXTRA_TOKENS
 
 
@@ -41,6 +41,11 @@ class ResultRecord:
     error: str | None  # None means the call succeeded
     truncated: bool  # True if the answer was cut off at the length limit
     prompt_hash: str  # fingerprint of the exact call (prompt, model, settings), see fingerprint_call()
+    # What the call was priced with, so cost_usd can be checked after prices change.
+    # Empty or 0 in lines saved before these fields existed.
+    model_id: str = ""
+    input_price_per_mtok: float = 0.0
+    output_price_per_mtok: float = 0.0
 
 
 def fingerprint_call(prompt: str, model_key: str, models: dict = MODELS) -> str:
@@ -62,9 +67,15 @@ def fingerprint_call(prompt: str, model_key: str, models: dict = MODELS) -> str:
 
 
 def make_record(
-    task_name: str, input_id: str, model_key: str, result: RunResult, prompt_hash: str = ""
+    task_name: str,
+    input_id: str,
+    model_key: str,
+    result: RunResult,
+    prompt_hash: str = "",
+    model: ModelInfo | None = None,
 ) -> ResultRecord:
-    """Combine the labels of a call with its RunResult, and add the current time."""
+    """Combine the labels of a call with its RunResult, and add the current time and, if the
+    model is given, its ID and prices."""
     return ResultRecord(
         task_name=task_name,
         input_id=input_id,
@@ -78,6 +89,9 @@ def make_record(
         error=result.error,
         truncated=result.truncated,
         prompt_hash=prompt_hash,
+        model_id=model.model_id if model else "",
+        input_price_per_mtok=model.input_price_per_mtok if model else 0.0,
+        output_price_per_mtok=model.output_price_per_mtok if model else 0.0,
     )
 
 
